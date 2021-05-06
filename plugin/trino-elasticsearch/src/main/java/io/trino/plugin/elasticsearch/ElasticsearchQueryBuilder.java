@@ -18,6 +18,9 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slice;
 import io.trino.plugin.elasticsearch.aggregation.MetricAggregation;
 import io.trino.plugin.elasticsearch.aggregation.TermAggregation;
+import io.trino.plugin.elasticsearch.client.composite.CompositeAggregationBuilder;
+import io.trino.plugin.elasticsearch.client.composite.CompositeValuesSourceBuilder;
+import io.trino.plugin.elasticsearch.client.composite.TermsValuesSourceBuilder;
 import io.trino.spi.predicate.Domain;
 import io.trino.spi.predicate.Range;
 import io.trino.spi.predicate.TupleDomain;
@@ -30,9 +33,6 @@ import org.elasticsearch.index.query.QueryStringQueryBuilder;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.index.query.TermQueryBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
-import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregationBuilder;
-import org.elasticsearch.search.aggregations.bucket.composite.CompositeValuesSourceBuilder;
-import org.elasticsearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder;
 import org.elasticsearch.search.aggregations.metrics.avg.AvgAggregationBuilder;
 import org.elasticsearch.search.aggregations.metrics.max.MaxAggregationBuilder;
 import org.elasticsearch.search.aggregations.metrics.min.MinAggregationBuilder;
@@ -108,16 +108,13 @@ public final class ElasticsearchQueryBuilder
         if (termAggregations != null && !termAggregations.isEmpty()) {
             List<CompositeValuesSourceBuilder<?>> compositeValuesSourceBuilderList = new ArrayList<>();
             for (TermAggregation termAggregation : termAggregations) {
-                compositeValuesSourceBuilderList.add(new TermsValuesSourceBuilder(termAggregation.getTerm()).field(termAggregation.getTerm()));
+                compositeValuesSourceBuilderList.add(new TermsValuesSourceBuilder(termAggregation.getTerm())
+                        .field(termAggregation.getTerm()).missingBucket(true));
             }
-            compositeAggregationBuilder = new CompositeAggregationBuilder("composite", compositeValuesSourceBuilderList);
+            compositeAggregationBuilder = new CompositeAggregationBuilder("groupBy", compositeValuesSourceBuilderList);
             // pagination
-            if (pageSize.isPresent()) {
-                compositeAggregationBuilder.size(pageSize.get());
-            }
-            if (after.isPresent()) {
-                compositeAggregationBuilder.aggregateAfter(after.get());
-            }
+            pageSize.ifPresent(compositeAggregationBuilder::size);
+            after.ifPresent(compositeAggregationBuilder::aggregateAfter);
             aggregationsBuilder.add(compositeAggregationBuilder);
         }
         if (aggregates != null && !aggregates.isEmpty()) {

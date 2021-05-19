@@ -14,13 +14,19 @@
 package io.trino.plugin.elasticsearch.decoders;
 
 import com.google.common.primitives.Longs;
+import io.trino.plugin.elasticsearch.client.IndexMetadata;
 import io.trino.spi.TrinoException;
 import io.trino.spi.block.BlockBuilder;
+import io.trino.spi.type.Type;
 import org.elasticsearch.common.document.DocumentField;
 import org.elasticsearch.search.SearchHit;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.util.List;
 import java.util.function.Supplier;
 
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -36,10 +42,12 @@ public class TimestampDecoder
         implements Decoder
 {
     private final String path;
+    private final List<String> formats;
 
-    public TimestampDecoder(String path)
+    public TimestampDecoder(String path, Type type)
     {
         this.path = requireNonNull(path, "path is null");
+        this.formats = ((IndexMetadata.DateTimeType) type).getFormats();
     }
 
     @Override
@@ -70,7 +78,13 @@ public class TimestampDecoder
                     timestamp = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), UTC);
                 }
                 else {
-                    timestamp = ISO_DATE_TIME.parse(valueString, LocalDateTime::from);
+                    DateTimeFormatterBuilder parser = new DateTimeFormatterBuilder().appendOptional(ISO_DATE_TIME);
+                    for(String format : formats){
+                        parser.appendOptional(DateTimeFormatter.ofPattern(format));
+                    }
+                    DateTimeFormatter formatter = parser.toFormatter();
+                    timestamp = LocalDateTime.parse(valueString, formatter);
+
                 }
             }
             else if (value instanceof Number) {

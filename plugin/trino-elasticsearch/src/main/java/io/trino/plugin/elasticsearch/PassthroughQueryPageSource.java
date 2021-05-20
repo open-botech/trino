@@ -26,7 +26,7 @@ import java.io.IOException;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 import static java.util.Objects.requireNonNull;
 
-public class PassthroughQueryPageSource
+    public class PassthroughQueryPageSource
         implements ConnectorPageSource
 {
     private final long readTimeNanos;

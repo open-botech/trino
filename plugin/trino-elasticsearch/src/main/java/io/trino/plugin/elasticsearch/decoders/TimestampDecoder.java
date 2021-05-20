@@ -21,6 +21,8 @@ import org.elasticsearch.search.SearchHit;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.function.Supplier;
 
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -57,7 +59,6 @@ public class TimestampDecoder
         else {
             value = getter.get();
         }
-
         if (value == null) {
             output.appendNull();
         }
@@ -70,7 +71,8 @@ public class TimestampDecoder
                     timestamp = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), UTC);
                 }
                 else {
-                    timestamp = ISO_DATE_TIME.parse(valueString, LocalDateTime::from);
+                    DateTimeFormatter formatter = new DateTimeFormatterBuilder().appendOptional(ISO_DATE_TIME).appendOptional(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).toFormatter();
+                    timestamp = LocalDateTime.parse(valueString, formatter);
                 }
             }
             else if (value instanceof Number) {

@@ -302,12 +302,13 @@ public class ElasticsearchMetadata
                     return BOOLEAN;
                 case "binary":
                     return VARBINARY;
-
             }
         }
         else if (type instanceof DateTimeType) {
-            return TIMESTAMP_MILLIS;
-
+            if (((DateTimeType) type).getFormats().isEmpty()) {
+                return TIMESTAMP_MILLIS;
+            }
+            // otherwise, skip -- we don't support custom formats, yet
         }
         else if (type instanceof ObjectType) {
             ObjectType objectType = (ObjectType) type;

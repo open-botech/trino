@@ -266,6 +266,7 @@ public class ScanQueryPageSource
                     if (column.getName().equals(SOURCE.getName())) {
                         return new SourceColumnDecoder();
                     }
+
                     return createDecoder(column.getName(), column.getType());
                 })
                 .collect(toImmutableList());
@@ -280,7 +281,7 @@ public class ScanQueryPageSource
             return new VarbinaryDecoder(path);
         }
         if (type.equals(TIMESTAMP_MILLIS)) {
-            return new TimestampDecoder(path,type);
+            return new TimestampDecoder(path);
         }
         if (type.equals(BOOLEAN)) {
             return new BooleanDecoder(path);

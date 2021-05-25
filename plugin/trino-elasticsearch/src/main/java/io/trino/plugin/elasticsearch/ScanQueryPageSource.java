@@ -17,6 +17,7 @@ import com.google.common.collect.AbstractIterator;
 import com.google.common.collect.ImmutableList;
 import io.airlift.log.Logger;
 import io.trino.plugin.elasticsearch.client.ElasticsearchClient;
+import io.trino.plugin.elasticsearch.client.IndexMetadata;
 import io.trino.plugin.elasticsearch.decoders.ArrayDecoder;
 import io.trino.plugin.elasticsearch.decoders.BigintDecoder;
 import io.trino.plugin.elasticsearch.decoders.BooleanDecoder;
@@ -268,12 +269,12 @@ public class ScanQueryPageSource
                         return new SourceColumnDecoder();
                     }
 
-                    return createDecoder(column.getName(), column.getType());
+                    return createDecoder(column.getName(), column.getType(),column.getRawType());
                 })
                 .collect(toImmutableList());
     }
 
-    public static Decoder createDecoder(String path, Type type)
+    public static Decoder createDecoder(String path, Type type,  IndexMetadata.Type rawType)
     {
         if (type.equals(VARCHAR)) {
             return new VarcharDecoder(path);
@@ -282,7 +283,8 @@ public class ScanQueryPageSource
             return new VarbinaryDecoder(path);
         }
         if (type.equals(TIMESTAMP_MILLIS)) {
-            return new TimestampDecoder(path);
+            IndexMetadata.DateTimeType dateTimeTYpe = (IndexMetadata.DateTimeType) rawType;
+            return new TimestampDecoder(path,dateTimeTYpe.getFormats());
         }
         if (type.equals(BOOLEAN)) {
             return new BooleanDecoder(path);
@@ -312,7 +314,7 @@ public class ScanQueryPageSource
             RowType rowType = (RowType) type;
 
             List<Decoder> decoders = rowType.getFields().stream()
-                    .map(field -> createDecoder(appendPath(path, field.getName().get()), field.getType()))
+                    .map(field -> createDecoder(appendPath(path, field.getName().get()), field.getType(),rawType))
                     .collect(toImmutableList());
 
             List<String> fieldNames = rowType.getFields().stream()
@@ -325,7 +327,7 @@ public class ScanQueryPageSource
         if (type instanceof ArrayType) {
             Type elementType = ((ArrayType) type).getElementType();
 
-            return new ArrayDecoder(createDecoder(path, elementType));
+            return new ArrayDecoder(createDecoder(path, elementType,rawType));
         }
 
         throw new UnsupportedOperationException("Type not supported: " + type);

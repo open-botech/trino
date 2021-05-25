@@ -104,7 +104,7 @@ public class ElasticsearchMetadata
 
     private static final Map<String, ColumnHandle> PASSTHROUGH_QUERY_COLUMNS = ImmutableMap.of(
             PASSTHROUGH_QUERY_RESULT_COLUMN_NAME,
-            new ElasticsearchColumnHandle(PASSTHROUGH_QUERY_RESULT_COLUMN_NAME, VARCHAR, false));
+            new ElasticsearchColumnHandle(PASSTHROUGH_QUERY_RESULT_COLUMN_NAME, VARCHAR, new PrimitiveType("keyword"),false));
 
     private final Type ipAddressType;
     private final ElasticsearchClient client;
@@ -171,6 +171,7 @@ public class ElasticsearchMetadata
             ElasticsearchColumnHandle newColumn = new ElasticsearchColumnHandle(
                     colName,
                     aggregationFunction.getOutputType(),
+                    null,
                     // new column never support predicates
                     false);
             projections.add(new Variable(colName, aggregationFunction.getOutputType()));
@@ -328,6 +329,7 @@ public class ElasticsearchMetadata
             result.put(field.getName(), new ElasticsearchColumnHandle(
                     field.getName(),
                     toTrinoType(field),
+                    field.getType(),
                     supportsPredicates(field.getType())));
         }
 

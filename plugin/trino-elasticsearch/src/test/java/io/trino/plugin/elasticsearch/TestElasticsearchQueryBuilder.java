@@ -16,6 +16,7 @@ package io.trino.plugin.elasticsearch;
 import com.google.common.collect.ImmutableList;
 import io.trino.plugin.elasticsearch.aggregation.MetricAggregation;
 import io.trino.plugin.elasticsearch.aggregation.TermAggregation;
+import io.trino.plugin.elasticsearch.client.IndexMetadata;
 import io.trino.plugin.elasticsearch.client.composite.CompositeAggregationBuilder;
 import io.trino.plugin.elasticsearch.client.composite.CompositeValuesSourceBuilder;
 import io.trino.plugin.elasticsearch.client.composite.TermsValuesSourceBuilder;
@@ -38,9 +39,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class TestElasticsearchQueryBuilder
 {
     private final List<ElasticsearchColumnHandle> columns =
-            ImmutableList.of(new ElasticsearchColumnHandle("hostname", VarcharType.VARCHAR, true),
-                    new ElasticsearchColumnHandle("total", RealType.REAL, true),
-                    new ElasticsearchColumnHandle("values", RealType.REAL, true));
+            ImmutableList.of(new ElasticsearchColumnHandle("hostname", VarcharType.VARCHAR, new IndexMetadata.PrimitiveType("keyword"),true),
+                    new ElasticsearchColumnHandle("total", RealType.REAL, new IndexMetadata.PrimitiveType("float"),true),
+                    new ElasticsearchColumnHandle("values", RealType.REAL, new IndexMetadata.PrimitiveType("float"),true));
     private final MetricAggregation metricAggregation1 =
             new MetricAggregation("avg", RealType.REAL, Optional.of(columns.get(2)), "avg_values");
     private final MetricAggregation metricAggregation2 =

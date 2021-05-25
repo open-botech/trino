@@ -219,7 +219,7 @@ public class AggregationQueryPageSource
     private List<Decoder> createDecoders(List<ElasticsearchColumnHandle> columns)
     {
         return columns.stream()
-                .map(column -> ScanQueryPageSource.createDecoder(column.getName(), column.getType()))
+                .map(column -> ScanQueryPageSource.createDecoder(column.getName(), column.getType(),column.getRawType()))
                 .collect(toImmutableList());
     }
 }

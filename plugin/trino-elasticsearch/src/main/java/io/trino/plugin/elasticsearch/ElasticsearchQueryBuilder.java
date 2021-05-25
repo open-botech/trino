@@ -18,6 +18,7 @@ import com.google.common.collect.ImmutableMap;
 import io.airlift.slice.Slice;
 import io.trino.plugin.elasticsearch.aggregation.MetricAggregation;
 import io.trino.plugin.elasticsearch.aggregation.TermAggregation;
+import io.trino.plugin.elasticsearch.client.IndexMetadata;
 import io.trino.plugin.elasticsearch.client.composite.CompositeAggregationBuilder;
 import io.trino.plugin.elasticsearch.client.composite.CompositeValuesSourceBuilder;
 import io.trino.plugin.elasticsearch.client.composite.TermsValuesSourceBuilder;
@@ -41,6 +42,7 @@ import org.elasticsearch.search.aggregations.metrics.valuecount.ValueCountAggreg
 
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -143,7 +145,7 @@ public final class ElasticsearchQueryBuilder
 
                 checkArgument(!domain.isNone(), "Unexpected NONE domain for %s", column.getName());
                 if (!domain.isAll()) {
-                    queryBuilder.filter(new BoolQueryBuilder().must(buildPredicate(column.getName(), domain, column.getType())));
+                    queryBuilder.filter(new BoolQueryBuilder().must(buildPredicate(column.getName(), domain, column.getType(),column.getRawType())));
                 }
             }
         }
@@ -156,7 +158,7 @@ public final class ElasticsearchQueryBuilder
         return new MatchAllQueryBuilder();
     }
 
-    private static QueryBuilder buildPredicate(String columnName, Domain domain, Type type)
+    private static QueryBuilder buildPredicate(String columnName, Domain domain, Type type, IndexMetadata.Type rawType)
     {
         checkArgument(domain.getType().isOrderable(), "Domain type must be orderable");
         BoolQueryBuilder boolQueryBuilder = new BoolQueryBuilder();
@@ -171,10 +173,10 @@ public final class ElasticsearchQueryBuilder
             return boolQueryBuilder;
         }
 
-        return buildTermQuery(boolQueryBuilder, columnName, domain, type);
+        return buildTermQuery(boolQueryBuilder, columnName, domain, type,rawType);
     }
 
-    private static QueryBuilder buildTermQuery(BoolQueryBuilder queryBuilder, String columnName, Domain domain, Type type)
+    private static QueryBuilder buildTermQuery(BoolQueryBuilder queryBuilder, String columnName, Domain domain, Type type, IndexMetadata.Type rawType)
     {
         for (Range range : domain.getValues().getRanges().getOrderedRanges()) {
             BoolQueryBuilder rangeQueryBuilder = new BoolQueryBuilder();
@@ -185,7 +187,7 @@ public final class ElasticsearchQueryBuilder
             }
             else {
                 if (!range.isLowUnbounded()) {
-                    Object lowBound = getValue(type, range.getLowBoundedValue());
+                    Object lowBound = getValue(type, rawType,range.getLowBoundedValue());
                     if (range.isLowInclusive()) {
                         rangeQueryBuilder.filter(new RangeQueryBuilder(columnName).gte(lowBound));
                     }
@@ -194,7 +196,7 @@ public final class ElasticsearchQueryBuilder
                     }
                 }
                 if (!range.isHighUnbounded()) {
-                    Object highBound = getValue(type, range.getHighBoundedValue());
+                    Object highBound = getValue(type, rawType,range.getHighBoundedValue());
                     if (range.isHighInclusive()) {
                         rangeQueryBuilder.filter(new RangeQueryBuilder(columnName).lte(highBound));
                     }
@@ -205,14 +207,14 @@ public final class ElasticsearchQueryBuilder
             }
 
             if (valuesToInclude.size() == 1) {
-                rangeQueryBuilder.filter(new TermQueryBuilder(columnName, getValue(type, getOnlyElement(valuesToInclude))));
+                rangeQueryBuilder.filter(new TermQueryBuilder(columnName, getValue(type, rawType, getOnlyElement(valuesToInclude))));
             }
             queryBuilder.should(rangeQueryBuilder);
         }
         return queryBuilder;
     }
 
-    private static Object getValue(Type type, Object value)
+    private static Object getValue(Type type,IndexMetadata.Type rawType, Object value)
     {
         if (type.equals(BOOLEAN) ||
                 type.equals(TINYINT) ||
@@ -229,10 +231,22 @@ public final class ElasticsearchQueryBuilder
             return ((Slice) value).toStringUtf8();
         }
         if (type.equals(TIMESTAMP_MILLIS)) {
-            return Instant.ofEpochMilli(floorDiv((Long) value, MICROSECONDS_PER_MILLISECOND))
-                    .atZone(ZoneOffset.UTC)
-                    .toLocalDateTime()
-                    .format(ISO_DATE_TIME);
+            if(rawType  instanceof IndexMetadata.DateTimeType ){
+                IndexMetadata.DateTimeType dateTimeType = (IndexMetadata.DateTimeType) rawType;
+                List<String> formats = dateTimeType.getFormats();
+               if(formats == null || formats.size() == 0){
+                   return Instant.ofEpochMilli(floorDiv((Long) value, MICROSECONDS_PER_MILLISECOND))
+                       .atZone(ZoneOffset.UTC)
+                       .toLocalDateTime()
+                       .format(ISO_DATE_TIME);
+               }else{
+                   String format = formats.get(0);
+                   return Instant.ofEpochMilli(floorDiv((Long) value, MICROSECONDS_PER_MILLISECOND))
+                       .atZone(ZoneOffset.UTC)
+                       .toLocalDateTime()
+                       .format(DateTimeFormatter.ofPattern(format));
+               }
+            }
         }
         throw new IllegalArgumentException("Unhandled type: " + type);
     }

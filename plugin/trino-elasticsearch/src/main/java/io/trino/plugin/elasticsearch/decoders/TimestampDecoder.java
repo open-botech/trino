@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
+import java.util.List;
 import java.util.function.Supplier;
 
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -38,10 +39,11 @@ public class TimestampDecoder
         implements Decoder
 {
     private final String path;
+    private final List<String> formats;
 
-    public TimestampDecoder(String path)
-    {
+    public TimestampDecoder(String path, List<String> formats) {
         this.path = requireNonNull(path, "path is null");
+        this.formats = requireNonNull(formats, "formats is null");
     }
 
     @Override
@@ -71,8 +73,11 @@ public class TimestampDecoder
                     timestamp = LocalDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), UTC);
                 }
                 else {
-                    DateTimeFormatter formatter = new DateTimeFormatterBuilder().appendOptional(ISO_DATE_TIME).appendOptional(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")).toFormatter();
-                    timestamp = LocalDateTime.parse(valueString, formatter);
+                    DateTimeFormatterBuilder formatterBuilder = new DateTimeFormatterBuilder().appendOptional(ISO_DATE_TIME);
+                    for(String format : formats){
+                        formatterBuilder.appendOptional(DateTimeFormatter.ofPattern(format));
+                    }
+                    timestamp = LocalDateTime.parse(valueString, formatterBuilder.toFormatter());
                 }
             }
             else if (value instanceof Number) {

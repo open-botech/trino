@@ -224,6 +224,7 @@ public class ElasticsearchClient
             RequestConfig requestConfig = RequestConfig.custom()
                     .setConnectTimeout(toIntExact(config.getConnectTimeout().toMillis()))
                     .setSocketTimeout(toIntExact(config.getRequestTimeout().toMillis()))
+                    .setConnectionRequestTimeout(toIntExact(config.getRequestTimeout().toMillis()))
                     .build();
 
             IOReactorConfig reactorConfig = IOReactorConfig.custom()

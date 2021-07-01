@@ -17,19 +17,20 @@ import com.google.common.collect.ImmutableList;
 import io.trino.plugin.elasticsearch.aggregation.MetricAggregation;
 import io.trino.plugin.elasticsearch.aggregation.TermAggregation;
 import io.trino.plugin.elasticsearch.client.IndexMetadata;
-import io.trino.plugin.elasticsearch.client.composite.CompositeAggregationBuilder;
-import io.trino.plugin.elasticsearch.client.composite.CompositeValuesSourceBuilder;
-import io.trino.plugin.elasticsearch.client.composite.TermsValuesSourceBuilder;
+import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregationBuilder;
+import org.elasticsearch.search.aggregations.bucket.composite.CompositeValuesSourceBuilder;
+import org.elasticsearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder;
 import io.trino.spi.type.RealType;
 import io.trino.spi.type.VarcharType;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
-import org.elasticsearch.search.aggregations.metrics.avg.AvgAggregationBuilder;
-import org.elasticsearch.search.aggregations.metrics.max.MaxAggregationBuilder;
-import org.elasticsearch.search.aggregations.metrics.min.MinAggregationBuilder;
-import org.elasticsearch.search.aggregations.metrics.sum.SumAggregationBuilder;
-import org.elasticsearch.search.aggregations.metrics.valuecount.ValueCountAggregationBuilder;
+import org.elasticsearch.search.aggregations.metrics.AvgAggregationBuilder;
+import org.elasticsearch.search.aggregations.metrics.MaxAggregationBuilder;
+import org.elasticsearch.search.aggregations.metrics.MinAggregationBuilder;
+import org.elasticsearch.search.aggregations.metrics.SumAggregationBuilder;
+import org.elasticsearch.search.aggregations.metrics.ValueCountAggregationBuilder;
 import org.testng.annotations.Test;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -67,7 +68,7 @@ public class TestElasticsearchQueryBuilder
                                 metricAggregation1, metricAggregation2, metricAggregation3, metricAggregation4, metricAggregation5, metricAggregation6));
         assertThat(aggBuilder).hasSize(1);
         assertThat(aggBuilder.get(0)).isExactlyInstanceOf(CompositeAggregationBuilder.class);
-        List<AggregationBuilder> subaggs = aggBuilder.get(0).getSubAggregations();
+        Collection<AggregationBuilder> subaggs = aggBuilder.get(0).getSubAggregations();
         assertAllAgg(subaggs);
         CompositeAggregationBuilder compositeAggregationBuilder = (CompositeAggregationBuilder) aggBuilder.get(0);
         List<CompositeValuesSourceBuilder<?>> sources = compositeAggregationBuilder.sources();
@@ -95,29 +96,29 @@ public class TestElasticsearchQueryBuilder
         CompositeAggregationBuilder compositeAggregationBuilder = (CompositeAggregationBuilder) aggBuilder.get(0);
         List<CompositeValuesSourceBuilder<?>> sources = compositeAggregationBuilder.sources();
         assertThat(sources.get(0)).isExactlyInstanceOf(TermsValuesSourceBuilder.class).hasFieldOrPropertyWithValue("field", "hostname");
-        List<AggregationBuilder> sub1 = aggBuilder.get(0).getSubAggregations();
+        Collection<AggregationBuilder> sub1 = aggBuilder.get(0).getSubAggregations();
         assertThat(sub1).hasSize(0);
     }
 
-    private void assertAllAgg(List<AggregationBuilder> allAggs)
+    private void assertAllAgg(Collection<AggregationBuilder> allAggs)
     {
         assertThat(allAggs).hasSize(6);
-        assertThat(allAggs.get(0)).isExactlyInstanceOf(AvgAggregationBuilder.class)
+        assertThat(allAggs.toArray()[0]).isExactlyInstanceOf(AvgAggregationBuilder.class)
                 .hasFieldOrPropertyWithValue("field", "values")
                 .hasFieldOrPropertyWithValue("name", "avg_values");
-        assertThat(allAggs.get(1)).isExactlyInstanceOf(MaxAggregationBuilder.class)
+        assertThat(allAggs.toArray()[1]).isExactlyInstanceOf(MaxAggregationBuilder.class)
                 .hasFieldOrPropertyWithValue("field", "values")
                 .hasFieldOrPropertyWithValue("name", "max_values");
-        assertThat(allAggs.get(2)).isExactlyInstanceOf(MinAggregationBuilder.class)
+        assertThat(allAggs.toArray()[2]).isExactlyInstanceOf(MinAggregationBuilder.class)
                 .hasFieldOrPropertyWithValue("field", "values")
                 .hasFieldOrPropertyWithValue("name", "min_values");
-        assertThat(allAggs.get(3)).isExactlyInstanceOf(SumAggregationBuilder.class)
+        assertThat(allAggs.toArray()[3]).isExactlyInstanceOf(SumAggregationBuilder.class)
                 .hasFieldOrPropertyWithValue("field", "values")
                 .hasFieldOrPropertyWithValue("name", "sum_values");
-        assertThat(allAggs.get(4)).isExactlyInstanceOf(ValueCountAggregationBuilder.class)
+        assertThat(allAggs.toArray()[4]).isExactlyInstanceOf(ValueCountAggregationBuilder.class)
                 .hasFieldOrPropertyWithValue("field", "values")
                 .hasFieldOrPropertyWithValue("name", "count_values");
-        assertThat(allAggs.get(5)).isExactlyInstanceOf(ValueCountAggregationBuilder.class)
+        assertThat(allAggs.toArray()[5]).isExactlyInstanceOf(ValueCountAggregationBuilder.class)
                 .hasFieldOrPropertyWithValue("field", "_id")
                 .hasFieldOrPropertyWithValue("name", "count_all");
     }

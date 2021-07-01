@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableMap;
 import io.trino.sql.planner.plan.AggregationNode;
 import org.apache.http.entity.ContentType;
 import org.apache.http.nio.entity.NStringEntity;
+import org.elasticsearch.client.Request;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
 
@@ -43,8 +44,13 @@ public class TestElasticsearch6ConnectorTest
         String mappings = "{\"mappings\": " +
                 "  {\"foo\": { \"dynamic\" : \"strict\" } }" +
                 "}";
+        Request request = new Request(
+                "PUT",
+                "/" + indexName);
+        request.setEntity(new NStringEntity(mappings, ContentType.APPLICATION_JSON));
+
         client.getLowLevelClient()
-                .performRequest("PUT", "/" + indexName, ImmutableMap.of(), new NStringEntity(mappings, ContentType.APPLICATION_JSON));
+                .performRequest(request);
 
         assertTableDoesNotExist(indexName);
     }

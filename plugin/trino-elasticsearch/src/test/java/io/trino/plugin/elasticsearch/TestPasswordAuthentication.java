@@ -25,8 +25,7 @@ import org.apache.http.HttpHost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.message.BasicHeader;
 import org.apache.http.nio.entity.NStringEntity;
-import org.elasticsearch.client.RestClient;
-import org.elasticsearch.client.RestHighLevelClient;
+import org.elasticsearch.client.*;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
@@ -100,14 +99,18 @@ public class TestPasswordAuthentication
         String json = new ObjectMapper().writeValueAsString(ImmutableMap.<String, Object>builder()
                 .put("value", 42L)
                 .build());
-
+        Request request = new Request(
+                "POST",
+                "/test/_doc?refresh");
+        request.setEntity(new NStringEntity(json, ContentType.APPLICATION_JSON));
+        RequestOptions.Builder builder = RequestOptions.DEFAULT.toBuilder();
+        builder.addHeader("Authorization", format("Basic %s", Base64.encodeAsString(format("%s:%s", USER, PASSWORD).getBytes(StandardCharsets.UTF_8))));
+        builder.setHttpAsyncResponseConsumerFactory(
+                new HttpAsyncResponseConsumerFactory
+                        .HeapBufferedResponseConsumerFactory(30 * 1024 * 1024 * 1024));
+        request.setOptions(builder.build());
         client.getLowLevelClient()
-                .performRequest(
-                        "POST",
-                        "/test/_doc?refresh",
-                        ImmutableMap.of(),
-                        new NStringEntity(json, ContentType.APPLICATION_JSON),
-                        new BasicHeader("Authorization", format("Basic %s", Base64.encodeAsString(format("%s:%s", USER, PASSWORD).getBytes(StandardCharsets.UTF_8)))));
+                .performRequest(request);
 
         assertThat(assertions.query("SELECT * FROM test"))
                 .matches("VALUES BIGINT '42'");

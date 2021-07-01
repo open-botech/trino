@@ -19,13 +19,13 @@ import io.airlift.slice.Slice;
 import io.trino.plugin.elasticsearch.aggregation.MetricAggregation;
 import io.trino.plugin.elasticsearch.aggregation.TermAggregation;
 import io.trino.plugin.elasticsearch.client.IndexMetadata;
-import io.trino.plugin.elasticsearch.client.composite.CompositeAggregationBuilder;
-import io.trino.plugin.elasticsearch.client.composite.CompositeValuesSourceBuilder;
-import io.trino.plugin.elasticsearch.client.composite.TermsValuesSourceBuilder;
 import io.trino.spi.predicate.Domain;
 import io.trino.spi.predicate.Range;
 import io.trino.spi.predicate.TupleDomain;
+import io.trino.spi.type.DateTimeEncoding;
+import io.trino.spi.type.TimeZoneKey;
 import io.trino.spi.type.Type;
+import org.elasticsearch.common.time.DateFormatter;
 import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.ExistsQueryBuilder;
 import org.elasticsearch.index.query.MatchAllQueryBuilder;
@@ -34,21 +34,19 @@ import org.elasticsearch.index.query.QueryStringQueryBuilder;
 import org.elasticsearch.index.query.RangeQueryBuilder;
 import org.elasticsearch.index.query.TermQueryBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
-import org.elasticsearch.search.aggregations.metrics.avg.AvgAggregationBuilder;
-import org.elasticsearch.search.aggregations.metrics.max.MaxAggregationBuilder;
-import org.elasticsearch.search.aggregations.metrics.min.MinAggregationBuilder;
-import org.elasticsearch.search.aggregations.metrics.sum.SumAggregationBuilder;
-import org.elasticsearch.search.aggregations.metrics.valuecount.ValueCountAggregationBuilder;
+import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregationBuilder;
+import org.elasticsearch.search.aggregations.bucket.composite.CompositeValuesSourceBuilder;
+import org.elasticsearch.search.aggregations.bucket.composite.TermsValuesSourceBuilder;
+import org.elasticsearch.search.aggregations.metrics.AvgAggregationBuilder;
+import org.elasticsearch.search.aggregations.metrics.MaxAggregationBuilder;
+import org.elasticsearch.search.aggregations.metrics.MinAggregationBuilder;
+import org.elasticsearch.search.aggregations.metrics.SumAggregationBuilder;
+import org.elasticsearch.search.aggregations.metrics.ValueCountAggregationBuilder;
 
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiFunction;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -60,7 +58,7 @@ import static io.trino.spi.type.DoubleType.DOUBLE;
 import static io.trino.spi.type.IntegerType.INTEGER;
 import static io.trino.spi.type.RealType.REAL;
 import static io.trino.spi.type.SmallintType.SMALLINT;
-import static io.trino.spi.type.TimestampType.TIMESTAMP_MILLIS;
+import static io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
 import static io.trino.spi.type.Timestamps.MICROSECONDS_PER_MILLISECOND;
 import static io.trino.spi.type.TinyintType.TINYINT;
 import static io.trino.spi.type.VarcharType.VARCHAR;
@@ -230,22 +228,13 @@ public final class ElasticsearchQueryBuilder
         if (type.equals(VARCHAR)) {
             return ((Slice) value).toStringUtf8();
         }
-        if (type.equals(TIMESTAMP_MILLIS)) {
+        if (type.equals(TIMESTAMP_TZ_MILLIS)) {
             if(rawType  instanceof IndexMetadata.DateTimeType ){
                 IndexMetadata.DateTimeType dateTimeType = (IndexMetadata.DateTimeType) rawType;
-                List<String> formats = dateTimeType.getFormats();
-               if(formats == null || formats.size() == 0){
-                   return Instant.ofEpochMilli(floorDiv((Long) value, MICROSECONDS_PER_MILLISECOND))
-                       .atZone(ZoneOffset.UTC)
-                       .toLocalDateTime()
-                       .format(ISO_DATE_TIME);
-               }else{
-                   String format = formats.get(0);
-                   return Instant.ofEpochMilli(floorDiv((Long) value, MICROSECONDS_PER_MILLISECOND))
-                       .atZone(ZoneOffset.UTC)
-                       .toLocalDateTime()
-                       .format(DateTimeFormatter.ofPattern(format));
-               }
+                String format = dateTimeType.getFormat();
+                long millsUtc = DateTimeEncoding.unpackMillisUtc((Long) value);
+                return DateFormatter.forPattern(Arrays.asList(format.split("\\|\\|")).get(0)).formatMillis(millsUtc);
+
             }
         }
         throw new IllegalArgumentException("Unhandled type: " + type);

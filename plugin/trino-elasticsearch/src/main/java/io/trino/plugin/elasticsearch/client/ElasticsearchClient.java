@@ -54,10 +54,7 @@ import org.elasticsearch.action.search.ClearScrollRequest;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.search.SearchScrollRequest;
-import org.elasticsearch.client.Response;
-import org.elasticsearch.client.ResponseException;
-import org.elasticsearch.client.RestClient;
-import org.elasticsearch.client.RestClientBuilder;
+import org.elasticsearch.client.*;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
@@ -189,18 +186,6 @@ public class ElasticsearchClient
         // discover other nodes in the cluster and add them to the client
         try {
             Set<ElasticsearchNode> nodes = fetchNodes();
-
-            HttpHost[] hosts = nodes.stream()
-                    .map(ElasticsearchNode::getAddress)
-                    .filter(Optional::isPresent)
-                    .map(Optional::get)
-                    .map(address -> HttpHost.create(format("%s://%s", tlsEnabled ? "https" : "http", address)))
-                    .toArray(HttpHost[]::new);
-
-            if (hosts.length > 0 && !ignorePublishAddress) {
-                client.getLowLevelClient().setHosts(hosts);
-            }
-
             this.nodes.set(nodes);
         }
         catch (Throwable e) {
@@ -217,14 +202,12 @@ public class ElasticsearchClient
             TimeStat backpressureStats)
     {
         RestClientBuilder builder = RestClient.builder(
-                new HttpHost(config.getHost(), config.getPort(), config.isTlsEnabled() ? "https" : "http"))
-                .setMaxRetryTimeoutMillis(toIntExact(config.getMaxRetryTime().toMillis()));
+                new HttpHost(config.getHost(), config.getPort(), config.isTlsEnabled() ? "https" : "http"));
 
         builder.setHttpClientConfigCallback(ignored -> {
             RequestConfig requestConfig = RequestConfig.custom()
                     .setConnectTimeout(toIntExact(config.getConnectTimeout().toMillis()))
                     .setSocketTimeout(toIntExact(config.getRequestTimeout().toMillis()))
-                    .setConnectionRequestTimeout(toIntExact(config.getRequestTimeout().toMillis()))
                     .build();
 
             IOReactorConfig reactorConfig = IOReactorConfig.custom()
@@ -477,8 +460,9 @@ public class ElasticsearchClient
         String path = format("/%s/_mappings", index);
 
         try {
+            Request request = new Request("GET", path);
             Response response = client.getLowLevelClient()
-                    .performRequest("GET", path);
+                    .performRequest(request);
 
             return response.getStatusLine().getStatusCode() == 200;
         }
@@ -599,11 +583,7 @@ public class ElasticsearchClient
 
             switch (type) {
                 case "date":
-                    List<String> formats = ImmutableList.of();
-                    if (value.has("format")) {
-                        formats = Arrays.asList(value.get("format").asText().split("\\|\\|"));
-                    }
-                    result.add(new IndexMetadata.Field(isArray, name, new IndexMetadata.DateTimeType(formats)));
+                    result.add(new IndexMetadata.Field(isArray, name, new IndexMetadata.DateTimeType(value.get("format")!=null?value.get("format").asText():"date_optional_time")));
                     break;
 
                 case "nested":
@@ -638,14 +618,14 @@ public class ElasticsearchClient
 
         Response response;
         try {
+            Request request = new Request( "GET", path);
+            request.setEntity(new ByteArrayEntity(query.getBytes(UTF_8)));
+            RequestOptions.Builder builder = RequestOptions.DEFAULT.toBuilder();
+            builder.addHeader("Content-Type", "application/json");
+            builder.addHeader("Accept-Encoding", "application/json");
+            request.setOptions(builder.build());
             response = client.getLowLevelClient()
-                    .performRequest(
-                            "GET",
-                            path,
-                            ImmutableMap.of(),
-                            new ByteArrayEntity(query.getBytes(UTF_8)),
-                            new BasicHeader("Content-Type", "application/json"),
-                            new BasicHeader("Accept-Encoding", "application/json"));
+                    .performRequest(request);
         }
         catch (IOException e) {
             throw new TrinoException(ELASTICSEARCH_CONNECTION_ERROR, e);
@@ -668,7 +648,6 @@ public class ElasticsearchClient
             QueryBuilder query,
             Optional<List<AggregationBuilder>> aggregations,
             Optional<List<String>> fields,
-            List<String> documentFields,
             Optional<String> sort,
             OptionalLong limit)
     {
@@ -693,7 +672,6 @@ public class ElasticsearchClient
                 sourceBuilder.fetchSource(values.toArray(new String[0]), null);
             }
         });
-        documentFields.forEach(sourceBuilder::docValueField);
 
         SearchRequest request = new SearchRequest(index)
                 .searchType(QUERY_THEN_FETCH)
@@ -714,7 +692,7 @@ public class ElasticsearchClient
 
         long start = System.nanoTime();
         try {
-            return client.search(request);
+            return client.search(request,RequestOptions.DEFAULT);
         }
         catch (IOException e) {
             throw new TrinoException(ELASTICSEARCH_CONNECTION_ERROR, e);
@@ -744,7 +722,7 @@ public class ElasticsearchClient
 
         long start = System.nanoTime();
         try {
-            return client.searchScroll(request);
+            return client.searchScroll(request, RequestOptions.DEFAULT);
         }
         catch (IOException e) {
             throw new TrinoException(ELASTICSEARCH_CONNECTION_ERROR, e);
@@ -765,13 +743,14 @@ public class ElasticsearchClient
         try {
             Response response;
             try {
+                Request request = new Request( "GET", format("/%s/_count?preference=_shards:%s", index, shard));
+                request.setEntity(new StringEntity(sourceBuilder.toString()));
+                RequestOptions.Builder builder = RequestOptions.DEFAULT.toBuilder();
+                builder.addHeader("Content-Type", "application/json");
+                request.setOptions(builder.build());
+
                 response = client.getLowLevelClient()
-                        .performRequest(
-                                "GET",
-                                format("/%s/_count?preference=_shards:%s", index, shard),
-                                ImmutableMap.of(),
-                                new StringEntity(sourceBuilder.toString()),
-                                new BasicHeader("Content-Type", "application/json"));
+                        .performRequest(request);
             }
             catch (ResponseException e) {
                 throw propagate(e);
@@ -798,7 +777,7 @@ public class ElasticsearchClient
         ClearScrollRequest request = new ClearScrollRequest();
         request.addScrollId(scrollId);
         try {
-            client.clearScroll(request);
+            client.clearScroll(request,RequestOptions.DEFAULT);
         }
         catch (IOException e) {
             throw new TrinoException(ELASTICSEARCH_CONNECTION_ERROR, e);
@@ -839,8 +818,9 @@ public class ElasticsearchClient
 
         Response response;
         try {
+            Request request = new Request("GET", path);
             response = client.getLowLevelClient()
-                    .performRequest("GET", path);
+                    .performRequest(request);
         }
         catch (IOException e) {
             throw new TrinoException(ELASTICSEARCH_CONNECTION_ERROR, e);

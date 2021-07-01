@@ -15,7 +15,6 @@ package io.trino.plugin.elasticsearch;
 
 import com.google.common.collect.ImmutableList;
 import io.trino.plugin.elasticsearch.client.ElasticsearchClient;
-import io.trino.plugin.elasticsearch.client.composite.CompositeAggregation;
 import io.trino.plugin.elasticsearch.decoders.Decoder;
 import io.trino.spi.Page;
 import io.trino.spi.block.Block;
@@ -25,6 +24,7 @@ import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.aggregations.Aggregation;
 import org.elasticsearch.search.aggregations.Aggregations;
+import org.elasticsearch.search.aggregations.bucket.composite.CompositeAggregation;
 import org.elasticsearch.search.aggregations.metrics.NumericMetricsAggregation;
 
 import java.io.IOException;
@@ -109,7 +109,6 @@ public class AggregationQueryPageSource
                 Optional.ofNullable(
                         buildAggregationQuery(table.getTermAggregations(), table.getMetricAggregations(), Optional.of(pageSize), after)),
                 Optional.empty(),
-                Collections.emptyList(),
                 Optional.empty(),
                 table.getLimit());
         readTimeNanos += System.nanoTime() - start;

@@ -97,18 +97,18 @@ public class IndexMetadata
     public static class DateTimeType
             implements Type
     {
-        private final List<String> formats;
+        private final String format;
         @JsonCreator
-        public DateTimeType(@JsonProperty("formats")List<String> formats)
+        public DateTimeType(@JsonProperty("format")String format)
         {
-            requireNonNull(formats, "formats is null");
+            requireNonNull(format, "format is null");
 
-            this.formats = ImmutableList.copyOf(formats);
+            this.format = format;
         }
         @JsonProperty
-        public List<String> getFormats()
+        public String getFormat()
         {
-            return formats;
+            return format;
         }
     }
 

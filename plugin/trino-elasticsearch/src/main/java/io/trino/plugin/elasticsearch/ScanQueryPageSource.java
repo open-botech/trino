@@ -68,7 +68,7 @@ import static io.trino.spi.type.DoubleType.DOUBLE;
 import static io.trino.spi.type.IntegerType.INTEGER;
 import static io.trino.spi.type.RealType.REAL;
 import static io.trino.spi.type.SmallintType.SMALLINT;
-import static io.trino.spi.type.TimestampType.TIMESTAMP_MILLIS;
+import static io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
 import static io.trino.spi.type.TinyintType.TINYINT;
 import static io.trino.spi.type.VarbinaryType.VARBINARY;
 import static io.trino.spi.type.VarcharType.VARCHAR;
@@ -110,11 +110,11 @@ public class ScanQueryPageSource
         // Columns to fetch as doc_fields instead of pulling them out of the JSON source
         // This is convenient for types such as DATE, TIMESTAMP, etc, which have multiple possible
         // representations in JSON, but a single normalized representation as doc_field.
-        List<String> documentFields = flattenFields(columns).entrySet().stream()
-                .filter(entry -> entry.getValue().equals(TIMESTAMP_MILLIS))
+     /*   List<String> documentFields = flattenFields(columns).entrySet().stream()
+                .filter(entry -> entry.getValue().equals(TIMESTAMP_TZ_MILLIS))
                 .map(Map.Entry::getKey)
                 .collect(toImmutableList());
-
+*/
         columnBuilders = columns.stream()
                 .map(ElasticsearchColumnHandle::getType)
                 .map(type -> type.createBlockBuilder(null, 1))
@@ -141,7 +141,6 @@ public class ScanQueryPageSource
                 buildSearchQuery(table.getConstraint().transform(ElasticsearchColumnHandle.class::cast), table.getQuery()),
                 Optional.empty(),
                 needAllFields ? Optional.empty() : Optional.of(requiredFields),
-                documentFields,
                 sort,
                 table.getLimit());
         readTimeNanos += System.nanoTime() - start;
@@ -282,9 +281,9 @@ public class ScanQueryPageSource
         if (type.equals(VARBINARY)) {
             return new VarbinaryDecoder(path);
         }
-        if (type.equals(TIMESTAMP_MILLIS)) {
-            IndexMetadata.DateTimeType dateTimeTYpe = (IndexMetadata.DateTimeType) rawType;
-            return new TimestampDecoder(path,dateTimeTYpe.getFormats());
+        if (type.equals(TIMESTAMP_TZ_MILLIS)) {
+            IndexMetadata.DateTimeType dateTimeType = (IndexMetadata.DateTimeType) rawType;
+            return new TimestampDecoder(path,dateTimeType.getFormat());
         }
         if (type.equals(BOOLEAN)) {
             return new BooleanDecoder(path);

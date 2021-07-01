@@ -78,7 +78,7 @@ import static io.trino.spi.type.DoubleType.DOUBLE;
 import static io.trino.spi.type.IntegerType.INTEGER;
 import static io.trino.spi.type.RealType.REAL;
 import static io.trino.spi.type.SmallintType.SMALLINT;
-import static io.trino.spi.type.TimestampType.TIMESTAMP_MILLIS;
+import static io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
 import static io.trino.spi.type.TinyintType.TINYINT;
 import static io.trino.spi.type.VarbinaryType.VARBINARY;
 import static io.trino.spi.type.VarcharType.VARCHAR;
@@ -171,7 +171,7 @@ public class ElasticsearchMetadata
             ElasticsearchColumnHandle newColumn = new ElasticsearchColumnHandle(
                     colName,
                     aggregationFunction.getOutputType(),
-                    null,
+                    metricAggregation.get().getColumnHandle().get().getRawType(),
                     // new column never support predicates
                     false);
             projections.add(new Variable(colName, aggregationFunction.getOutputType()));
@@ -397,7 +397,7 @@ public class ElasticsearchMetadata
             }
         }
         else if (type instanceof DateTimeType) {
-            return TIMESTAMP_MILLIS;
+            return TIMESTAMP_TZ_MILLIS;
         }
         else if (type instanceof ObjectType) {
             ObjectType objectType = (ObjectType) type;

@@ -16,7 +16,7 @@
     <properties>
         <air.main.basedir>${project.parent.basedir}</air.main.basedir>
         <dep.log4j.version>2.13.3</dep.log4j.version>
-        <dep.elasticsearch.version>7.0.0</dep.elasticsearch.version>
+        <dep.elasticsearch.version>6.7.0</dep.elasticsearch.version>
     </properties>
 
 
@@ -175,9 +175,6 @@
             <version>4.4.5</version>
         </dependency>
 
-
-
-
         <dependency>
             <groupId>org.elasticsearch</groupId>
             <artifactId>elasticsearch</artifactId>
@@ -190,19 +187,17 @@
             </exclusions>
 
         </dependency>
-        <dependency>
+       <dependency>
             <groupId>org.elasticsearch</groupId>
             <artifactId>elasticsearch-core</artifactId>
             <version>${dep.elasticsearch.version}</version>
         </dependency>
 
-<!--
         <dependency>
             <groupId>org.elasticsearch</groupId>
             <artifactId>elasticsearch-x-content</artifactId>
             <version>${dep.elasticsearch.version}</version>
         </dependency>
--->
 
         <dependency>
             <groupId>org.elasticsearch.client</groupId>

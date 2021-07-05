@@ -15,5 +15,5 @@ package io.trino.plugin.hive;
 
 public interface HiveMaterializedViewMetadataFactory
 {
-    HiveMaterializedViewMetadata create();
+    HiveMaterializedViewMetadata create(HiveMetastoreClosure hiveMetastoreClosure);
 }

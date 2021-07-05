@@ -5,10 +5,14 @@ Cassandra connector
 The Cassandra connector allows querying data stored in
 `Apache Cassandra <https://cassandra.apache.org/>`_.
 
-Compatibility
--------------
+Requirements
+------------
 
-Connector is tested against Cassandra version 2.2 and 3.11, but any intermediate or newer versions are expected to work.
+To connect to Cassandra, you need:
+
+* Cassandra version 2.2 or higher.
+* Network access from the Trino coordinator and workers to Cassandra.
+  Port 9042 is the default port.
 
 Configuration
 -------------

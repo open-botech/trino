@@ -30,6 +30,7 @@ import io.trino.spi.connector.ConnectorOutputMetadata;
 import io.trino.spi.connector.ConnectorOutputTableHandle;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
+import io.trino.spi.connector.ConnectorTableLayoutHandle;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
 import io.trino.spi.connector.ConnectorTableSchema;
@@ -57,6 +58,7 @@ import io.trino.spi.security.TrinoPrincipal;
 import io.trino.spi.statistics.ComputedStatistics;
 import io.trino.spi.statistics.TableStatistics;
 
+import java.sql.Types;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -75,7 +77,9 @@ import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static io.trino.plugin.jdbc.JdbcMetadataSessionProperties.isAggregationPushdownEnabled;
 import static io.trino.plugin.jdbc.JdbcMetadataSessionProperties.isJoinPushdownEnabled;
 import static io.trino.plugin.jdbc.JdbcMetadataSessionProperties.isTopNPushdownEnabled;
+import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.trino.spi.StandardErrorCode.PERMISSION_DENIED;
+import static io.trino.spi.type.BigintType.BIGINT;
 import static java.lang.Math.max;
 import static java.util.Objects.requireNonNull;
 
@@ -173,7 +177,7 @@ public class DefaultJdbcMetadata
                 handle.getOtherReferencedTables(),
                 handle.getNextSyntheticColumnId());
 
-        return Optional.of(new ConstraintApplicationResult<>(handle, remainingFilter));
+        return Optional.of(new ConstraintApplicationResult<>(handle, remainingFilter, false));
     }
 
     private JdbcTableHandle flushAttributesAsQuery(ConnectorSession session, JdbcTableHandle handle)
@@ -223,7 +227,8 @@ public class DefaultJdbcMetadata
                                 assignment.getKey(),
                                 assignment.getValue(),
                                 ((JdbcColumnHandle) assignment.getValue()).getColumnType()))
-                        .collect(toImmutableList())));
+                        .collect(toImmutableList()),
+                false));
     }
 
     @Override
@@ -308,7 +313,7 @@ public class DefaultJdbcMetadata
                 handle.getAllReferencedTables(),
                 nextSyntheticColumnId);
 
-        return Optional.of(new AggregationApplicationResult<>(handle, projections.build(), resultAssignments.build(), ImmutableMap.of()));
+        return Optional.of(new AggregationApplicationResult<>(handle, projections.build(), resultAssignments.build(), ImmutableMap.of(), false));
     }
 
     @Override
@@ -391,7 +396,8 @@ public class DefaultJdbcMetadata
                                 .build(),
                         nextSyntheticColumnId),
                 ImmutableMap.copyOf(newLeftColumns),
-                ImmutableMap.copyOf(newRightColumns)));
+                ImmutableMap.copyOf(newRightColumns),
+                false));
     }
 
     private static Optional<JdbcColumnHandle> getVariableColumnHandle(Map<String, ColumnHandle> assignments, ConnectorExpression expression)
@@ -446,7 +452,7 @@ public class DefaultJdbcMetadata
                 handle.getOtherReferencedTables(),
                 handle.getNextSyntheticColumnId());
 
-        return Optional.of(new LimitApplicationResult<>(handle, jdbcClient.isLimitGuaranteed(session)));
+        return Optional.of(new LimitApplicationResult<>(handle, jdbcClient.isLimitGuaranteed(session), false));
     }
 
     @Override
@@ -494,7 +500,7 @@ public class DefaultJdbcMetadata
                 handle.getOtherReferencedTables(),
                 handle.getNextSyntheticColumnId());
 
-        return Optional.of(new TopNApplicationResult<>(sortedTableHandle, jdbcClient.isTopNLimitGuaranteed(session)));
+        return Optional.of(new TopNApplicationResult<>(sortedTableHandle, jdbcClient.isTopNGuaranteed(session), false));
     }
 
     @Override
@@ -656,6 +662,40 @@ public class DefaultJdbcMetadata
         JdbcOutputTableHandle jdbcInsertHandle = (JdbcOutputTableHandle) tableHandle;
         jdbcClient.finishInsertTable(session, jdbcInsertHandle);
         return Optional.empty();
+    }
+
+    @Override
+    public ColumnHandle getDeleteRowIdColumnHandle(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        // The column is used for row-level delete, which is not supported, but it's required during analysis anyway.
+        return new JdbcColumnHandle(
+                "$update_row_id",
+                new JdbcTypeHandle(Types.BIGINT, Optional.of("bigint"), Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty()),
+                BIGINT);
+    }
+
+    @Override
+    public ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle)
+    {
+        throw new TrinoException(NOT_SUPPORTED, "Unsupported delete");
+    }
+
+    @Override
+    public boolean supportsMetadataDelete(ConnectorSession session, ConnectorTableHandle tableHandle, ConnectorTableLayoutHandle tableLayoutHandle)
+    {
+        return true;
+    }
+
+    @Override
+    public Optional<ConnectorTableHandle> applyDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return Optional.of(handle);
+    }
+
+    @Override
+    public OptionalLong executeDelete(ConnectorSession session, ConnectorTableHandle handle)
+    {
+        return jdbcClient.delete(session, (JdbcTableHandle) handle);
     }
 
     @Override

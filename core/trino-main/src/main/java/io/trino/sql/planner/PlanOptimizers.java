@@ -19,6 +19,7 @@ import io.trino.SystemSessionProperties;
 import io.trino.cost.CostCalculator;
 import io.trino.cost.CostCalculator.EstimatedExchanges;
 import io.trino.cost.CostComparator;
+import io.trino.cost.ScalarStatsCalculator;
 import io.trino.cost.StatsCalculator;
 import io.trino.cost.TaskCountEstimator;
 import io.trino.execution.TaskManagerConfig;
@@ -74,6 +75,7 @@ import io.trino.sql.planner.iterative.rule.MergeLimitWithDistinct;
 import io.trino.sql.planner.iterative.rule.MergeLimitWithSort;
 import io.trino.sql.planner.iterative.rule.MergeLimitWithTopN;
 import io.trino.sql.planner.iterative.rule.MergeLimits;
+import io.trino.sql.planner.iterative.rule.MergePatternRecognitionNodes;
 import io.trino.sql.planner.iterative.rule.MergeProjectWithValues;
 import io.trino.sql.planner.iterative.rule.MergeUnion;
 import io.trino.sql.planner.iterative.rule.MultipleDistinctAggregationToMarkDistinct;
@@ -109,6 +111,8 @@ import io.trino.sql.planner.iterative.rule.PruneMarkDistinctColumns;
 import io.trino.sql.planner.iterative.rule.PruneOffsetColumns;
 import io.trino.sql.planner.iterative.rule.PruneOrderByInAggregation;
 import io.trino.sql.planner.iterative.rule.PruneOutputSourceColumns;
+import io.trino.sql.planner.iterative.rule.PrunePattenRecognitionColumns;
+import io.trino.sql.planner.iterative.rule.PrunePatternRecognitionSourceColumns;
 import io.trino.sql.planner.iterative.rule.PruneProjectColumns;
 import io.trino.sql.planner.iterative.rule.PruneRowNumberColumns;
 import io.trino.sql.planner.iterative.rule.PruneSampleColumns;
@@ -265,6 +269,7 @@ public class PlanOptimizers
             SplitManager splitManager,
             PageSourceManager pageSourceManager,
             StatsCalculator statsCalculator,
+            ScalarStatsCalculator scalarStatsCalculator,
             CostCalculator costCalculator,
             @EstimatedExchanges CostCalculator estimatedExchangesCostCalculator,
             CostComparator costComparator,
@@ -279,6 +284,7 @@ public class PlanOptimizers
                 splitManager,
                 pageSourceManager,
                 statsCalculator,
+                scalarStatsCalculator,
                 costCalculator,
                 estimatedExchangesCostCalculator,
                 costComparator,
@@ -295,6 +301,7 @@ public class PlanOptimizers
             SplitManager splitManager,
             PageSourceManager pageSourceManager,
             StatsCalculator statsCalculator,
+            ScalarStatsCalculator scalarStatsCalculator,
             CostCalculator costCalculator,
             CostCalculator estimatedExchangesCostCalculator,
             CostComparator costComparator,
@@ -332,6 +339,8 @@ public class PlanOptimizers
                 new PruneMarkDistinctColumns(),
                 new PruneOffsetColumns(),
                 new PruneOutputSourceColumns(),
+                new PrunePattenRecognitionColumns(),
+                new PrunePatternRecognitionSourceColumns(),
                 new PruneProjectColumns(),
                 new PruneRowNumberColumns(),
                 new PruneSampleColumns(),
@@ -597,7 +606,7 @@ public class PlanOptimizers
         // Perform redirection before push down of dereferences into table scan via PushProjectionIntoTableScan
         // Perform redirection after at least one PredicatePushDown and PushPredicateIntoTableScan to allow connector to use pushed down predicates in redirection decision
         // Perform redirection after at least table scan pruning rules because redirected table might have fewer columns
-        // PushPredicateIntoTableScan must be run after redirection
+        // PushPredicateIntoTableScan needs to be run again after redirection to ensure predicate push down into destination table scan
         // Column pruning rules need to be run after redirection
         builder.add(
                 new IterativeOptimizer(
@@ -613,7 +622,7 @@ public class PlanOptimizers
         Set<Rule<?>> pushIntoTableScanRulesExceptJoins = ImmutableSet.<Rule<?>>builder()
                 .addAll(columnPruningRules)
                 .addAll(projectionPushdownRules)
-                .add(new PushProjectionIntoTableScan(metadata, typeAnalyzer))
+                .add(new PushProjectionIntoTableScan(metadata, typeAnalyzer, scalarStatsCalculator))
                 .add(new RemoveRedundantIdentityProjections())
                 .add(new PushLimitIntoTableScan(metadata))
                 .add(new PushPredicateIntoTableScan(metadata, typeOperators, typeAnalyzer))
@@ -639,7 +648,7 @@ public class PlanOptimizers
                 estimatedExchangesCostCalculator,
                 ImmutableSet.<Rule<?>>builder()
                         .addAll(projectionPushdownRules)
-                        .add(new PushProjectionIntoTableScan(metadata, typeAnalyzer))
+                        .add(new PushProjectionIntoTableScan(metadata, typeAnalyzer, scalarStatsCalculator))
                         .build());
 
         builder.add(
@@ -710,6 +719,7 @@ public class PlanOptimizers
                                 // add UnaliasSymbolReferences when it's ported
                                 .add(new RemoveRedundantIdentityProjections())
                                 .addAll(GatherAndMergeWindows.rules())
+                                .addAll(MergePatternRecognitionNodes.rules())
                                 .add(new PushPredicateThroughProjectIntoRowNumber(metadata, typeOperators))
                                 .add(new PushPredicateThroughProjectIntoWindow(metadata, typeOperators))
                                 .build()),
@@ -854,7 +864,7 @@ public class PlanOptimizers
             // unalias symbols before adding exchanges to use same partitioning symbols in joins, aggregations and other
             // operators that require node partitioning
             builder.add(new UnaliasSymbolReferences(metadata));
-            builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new AddExchanges(metadata, typeOperators, typeAnalyzer)));
+            builder.add(new StatsRecordingPlanOptimizer(optimizerStats, new AddExchanges(metadata, typeOperators, typeAnalyzer, statsCalculator)));
         }
         //noinspection UnusedAssignment
         estimatedExchangesCostCalculator = null; // Prevent accidental use after AddExchanges

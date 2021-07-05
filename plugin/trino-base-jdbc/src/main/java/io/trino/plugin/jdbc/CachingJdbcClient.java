@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
@@ -239,9 +240,9 @@ public class CachingJdbcClient
     }
 
     @Override
-    public boolean isTopNLimitGuaranteed(ConnectorSession session)
+    public boolean isTopNGuaranteed(ConnectorSession session)
     {
-        return delegate.isTopNLimitGuaranteed(session);
+        return delegate.isTopNGuaranteed(session);
     }
 
     @Override
@@ -289,7 +290,7 @@ public class CachingJdbcClient
     public void finishInsertTable(ConnectorSession session, JdbcOutputTableHandle handle)
     {
         delegate.finishInsertTable(session, handle);
-        invalidateTableCaches(new SchemaTableName(handle.getSchemaName(), handle.getTableName()));
+        onDataChanged(new SchemaTableName(handle.getSchemaName(), handle.getTableName()));
     }
 
     @Override
@@ -435,6 +436,30 @@ public class CachingJdbcClient
         return delegate.getTableScanRedirection(session, tableHandle);
     }
 
+    public void onDataChanged(SchemaTableName table)
+    {
+        invalidateCache(statisticsCache, key -> key.tableHandle.references(table));
+    }
+
+    /**
+     * @deprecated {@link JdbcTableHandle}  is not a good representation of the table. For example, we don't want
+     * to distinguish between "a plan table" and "table with selected columns", or "a table with a constraint" here.
+     * Use {@link #onDataChanged(SchemaTableName)}, which avoids these ambiguities.
+     */
+    @Deprecated
+    public void onDataChanged(JdbcTableHandle handle)
+    {
+        invalidateCache(statisticsCache, key -> key.tableHandle.equals(handle));
+    }
+
+    @Override
+    public OptionalLong delete(ConnectorSession session, JdbcTableHandle handle)
+    {
+        OptionalLong deletedRowsCount = delegate.delete(session, handle);
+        onDataChanged(handle.getRequiredNamedRelation().getSchemaTableName());
+        return deletedRowsCount;
+    }
+
     private JdbcIdentityCacheKey getIdentityKey(ConnectorSession session)
     {
         return identityMapping.getRemoteUserCacheKey(JdbcIdentity.from(session));
@@ -495,11 +520,6 @@ public class CachingJdbcClient
                 .collect(toImmutableSet());
 
         cache.invalidateAll(cacheKeys);
-    }
-
-    public void onDataChanged(JdbcTableHandle handle)
-    {
-        invalidateCache(statisticsCache, key -> key.tableHandle.equals(handle));
     }
 
     private static final class ColumnsCacheKey

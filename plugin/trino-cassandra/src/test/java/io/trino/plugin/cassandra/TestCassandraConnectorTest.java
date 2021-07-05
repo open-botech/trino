@@ -161,14 +161,6 @@ public class TestCassandraConnectorTest
 
     @Test
     @Override
-    public void testRenameTable()
-    {
-        assertThatThrownBy(super::testRenameTable).hasMessage("This connector does not support renaming tables");
-        throw new SkipException("This connector does not support renaming tables");
-    }
-
-    @Test
-    @Override
     public void testAddColumn()
     {
         assertThatThrownBy(super::testAddColumn).hasMessage("This connector does not support adding columns");
@@ -853,6 +845,48 @@ public class TestCassandraConnectorTest
         execute("DELETE FROM " + keyspaceAndTable + whereMultiplePartitionKey);
         assertEquals(execute("SELECT * FROM " + keyspaceAndTable).getRowCount(), 6);
         assertEquals(execute("SELECT * FROM " + keyspaceAndTable + whereMultiplePartitionKey).getRowCount(), 0);
+    }
+
+    @Override
+    public void testDeleteWithComplexPredicate()
+    {
+        assertThatThrownBy(super::testDeleteWithComplexPredicate)
+                .hasStackTraceContaining("Deleting without partition key is not supported");
+    }
+
+    @Override
+    public void testDeleteWithSemiJoin()
+    {
+        assertThatThrownBy(super::testDeleteWithSemiJoin)
+                .hasStackTraceContaining("Deleting without partition key is not supported");
+    }
+
+    @Override
+    public void testDeleteWithSubquery()
+    {
+        assertThatThrownBy(super::testDeleteWithSubquery)
+                .hasStackTraceContaining("Deleting without partition key is not supported");
+    }
+
+    @Override
+    public void testDeleteWithVarcharPredicate()
+    {
+        assertThatThrownBy(super::testDeleteWithVarcharPredicate)
+                .hasStackTraceContaining("Deleting without partition key is not supported");
+    }
+
+    @Override
+    public void testDeleteAllTable()
+    {
+        assertThatThrownBy(super::testDeleteAllTable)
+                .hasStackTraceContaining("Deleting without partition key is not supported");
+    }
+
+    @Override
+    public void testRowLevelDelete()
+    {
+        assertThatThrownBy(super::testRowLevelDelete)
+                .hasStackTraceContaining("Deleting without partition key is not supported");
     }
 
     private void assertSelect(String tableName, boolean createdByTrino)

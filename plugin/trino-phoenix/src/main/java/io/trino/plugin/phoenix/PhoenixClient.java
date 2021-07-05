@@ -305,7 +305,7 @@ public class PhoenixClient
     }
 
     @Override
-    public boolean isTopNLimitGuaranteed(ConnectorSession session)
+    public boolean isTopNGuaranteed(ConnectorSession session)
     {
         return false;
     }
@@ -437,7 +437,7 @@ public class PhoenixClient
                             return arrayColumnMapping(session, trinoArrayType, jdbcTypeName);
                         });
         }
-        return legacyToPrestoType(session, connection, typeHandle);
+        return legacyColumnMapping(session, connection, typeHandle);
     }
 
     @Override

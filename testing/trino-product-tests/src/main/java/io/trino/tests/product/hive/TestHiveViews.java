@@ -90,7 +90,7 @@ public class TestHiveViews
         onTrino().executeQuery("DROP TABLE IF EXISTS pageAds");
         onTrino().executeQuery("CREATE TABLE pageAds(pageid, adid_list) WITH (format='TEXTFILE') AS " +
                 "VALUES " +
-                "  (CAST('two' AS varchar), ARRAY[11, 22]), " +
+                "  (VARCHAR 'two', ARRAY[11, 22]), " +
                 "  ('nothing', NULL), " +
                 "  ('zero', ARRAY[]), " +
                 "  ('one', ARRAY[42])");
@@ -117,6 +117,42 @@ public class TestHiveViews
                         row("one", 42),
                         row("nothing", null),
                         row("zero", null)));
+    }
+
+    @Test(groups = HIVE_VIEWS)
+    public void testLateralViewExplodeArrayOfStructs()
+    {
+        onTrino().executeQuery("DROP TABLE IF EXISTS pageAdsStructs");
+        onTrino().executeQuery("CREATE TABLE pageAdsStructs(pageid VARCHAR, adid_list ARRAY(ROW(a INTEGER, b INTEGER))) WITH (format='TEXTFILE')");
+        onTrino().executeQuery("INSERT INTO pageAdsStructs " +
+                "VALUES " +
+                "  ('two', ARRAY[ROW(11, 12), ROW(13, 14)]), " +
+                "  ('nothing', NULL), " +
+                "  ('zero', ARRAY[]), " +
+                "  ('one', ARRAY[ROW(42, 43)])");
+
+        onHive().executeQuery("DROP VIEW IF EXISTS hive_lateral_view_structs");
+        onHive().executeQuery("CREATE VIEW hive_lateral_view_structs as SELECT pageid, adid FROM pageAdsStructs LATERAL VIEW explode(adid_list) adTable AS adid");
+
+        assertViewQuery(
+                "SELECT pageid, adid.a, adid.b FROM hive_lateral_view_structs",
+                queryAssert -> queryAssert.containsOnly(
+                        row("two", 11, 12),
+                        row("two", 13, 14),
+                        row("one", 42, 43)));
+
+        onHive().executeQuery("DROP VIEW IF EXISTS hive_lateral_view_structs_outer_explode");
+        onHive().executeQuery("CREATE VIEW hive_lateral_view_structs_outer_explode as " +
+                "SELECT pageid, adid FROM pageAdsStructs LATERAL VIEW OUTER explode(adid_list) adTable AS adid");
+
+        assertViewQuery(
+                "SELECT pageid, adid.a, adid.b FROM hive_lateral_view_structs_outer_explode",
+                queryAssert -> queryAssert.containsOnly(
+                        row("two", 11, 12),
+                        row("two", 13, 14),
+                        row("one", 42, 43),
+                        row("nothing", null, null),
+                        row("zero", null, null)));
     }
 
     @Test(groups = HIVE_VIEWS)

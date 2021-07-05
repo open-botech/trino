@@ -24,6 +24,7 @@ import io.airlift.bootstrap.LifeCycleManager;
 import io.airlift.event.client.EventModule;
 import io.airlift.json.JsonModule;
 import io.trino.plugin.base.CatalogName;
+import io.trino.plugin.base.TypeDeserializerModule;
 import io.trino.plugin.base.classloader.ClassLoaderSafeConnectorAccessControl;
 import io.trino.plugin.base.classloader.ClassLoaderSafeConnectorPageSinkProvider;
 import io.trino.plugin.base.classloader.ClassLoaderSafeConnectorPageSourceProvider;
@@ -59,7 +60,6 @@ import io.trino.spi.connector.ConnectorSplitManager;
 import io.trino.spi.connector.SystemTable;
 import io.trino.spi.eventlistener.EventListener;
 import io.trino.spi.procedure.Procedure;
-import io.trino.spi.type.TypeManager;
 import org.weakref.jmx.guice.MBeanModule;
 
 import java.util.Map;
@@ -68,7 +68,7 @@ import java.util.Set;
 
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.inject.multibindings.Multibinder.newSetBinder;
-import static io.airlift.configuration.ConditionalModule.installModuleIf;
+import static io.airlift.configuration.ConditionalModule.conditionalModule;
 import static java.util.Objects.requireNonNull;
 
 public final class InternalHiveConnectorFactory
@@ -91,12 +91,13 @@ public final class InternalHiveConnectorFactory
                     new MBeanModule(),
                     new ConnectorObjectNameGeneratorModule(catalogName, "io.trino.plugin.hive", "trino.plugin.hive"),
                     new JsonModule(),
+                    new TypeDeserializerModule(context.getTypeManager()),
                     new HiveModule(),
                     new HiveHdfsModule(),
                     new HiveS3Module(),
                     new HiveGcsModule(),
                     new HiveAzureModule(),
-                    installModuleIf(RubixEnabledConfig.class, RubixEnabledConfig::isCacheEnabled, new RubixModule()),
+                    conditionalModule(RubixEnabledConfig.class, RubixEnabledConfig::isCacheEnabled, new RubixModule()),
                     new HiveMetastoreModule(metastore),
                     new HiveSecurityModule(catalogName),
                     new HiveAuthenticationModule(),
@@ -106,7 +107,6 @@ public final class InternalHiveConnectorFactory
                         binder.bind(NodeVersion.class).toInstance(new NodeVersion(context.getNodeManager().getCurrentNode().getVersion()));
                         binder.bind(NodeManager.class).toInstance(context.getNodeManager());
                         binder.bind(VersionEmbedder.class).toInstance(context.getVersionEmbedder());
-                        binder.bind(TypeManager.class).toInstance(context.getTypeManager());
                         binder.bind(PageIndexerFactory.class).toInstance(context.getPageIndexerFactory());
                         binder.bind(PageSorter.class).toInstance(context.getPageSorter());
                         binder.bind(CatalogName.class).toInstance(new CatalogName(catalogName));
@@ -131,7 +131,7 @@ public final class InternalHiveConnectorFactory
             Set<SessionPropertiesProvider> sessionPropertiesProviders = injector.getInstance(Key.get(new TypeLiteral<Set<SessionPropertiesProvider>>() {}));
             HiveTableProperties hiveTableProperties = injector.getInstance(HiveTableProperties.class);
             HiveAnalyzeProperties hiveAnalyzeProperties = injector.getInstance(HiveAnalyzeProperties.class);
-            HiveMaterializedViewMetadata hiveMaterializedViewMetadata = injector.getInstance(HiveMaterializedViewMetadataFactory.class).create();
+            HiveMaterializedViewPropertiesProvider hiveMaterializedViewPropertiesProvider = injector.getInstance(HiveMaterializedViewPropertiesProvider.class);
             ConnectorAccessControl accessControl = new ClassLoaderSafeConnectorAccessControl(
                     new SystemTableAwareAccessControl(injector.getInstance(ConnectorAccessControl.class)),
                     classLoader);
@@ -157,7 +157,7 @@ public final class InternalHiveConnectorFactory
                     HiveSchemaProperties.SCHEMA_PROPERTIES,
                     hiveTableProperties.getTableProperties(),
                     hiveAnalyzeProperties.getAnalyzeProperties(),
-                    hiveMaterializedViewMetadata.getMaterializedViewProperties(),
+                    hiveMaterializedViewPropertiesProvider.getMaterializedViewProperties(),
                     accessControl,
                     classLoader);
         }

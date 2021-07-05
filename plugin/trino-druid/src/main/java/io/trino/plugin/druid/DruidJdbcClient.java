@@ -48,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
@@ -149,7 +150,7 @@ public class DruidJdbcClient
                 return Optional.of(defaultVarcharColumnMapping(columnSize, true));
         }
         // TODO implement proper type mapping
-        return legacyToPrestoType(session, connection, typeHandle);
+        return legacyColumnMapping(session, connection, typeHandle);
     }
 
     @Override
@@ -220,6 +221,13 @@ public class DruidJdbcClient
     public boolean isLimitGuaranteed(ConnectorSession session)
     {
         return true;
+    }
+
+    @Override
+    public OptionalLong delete(ConnectorSession session, JdbcTableHandle handle)
+    {
+        // DELETE statement is not yet support in Druid (Avatica JDBC, see https://issues.apache.org/jira/browse/CALCITE-706)
+        throw new TrinoException(NOT_SUPPORTED, "This connector does not support deletes");
     }
 
     @Override

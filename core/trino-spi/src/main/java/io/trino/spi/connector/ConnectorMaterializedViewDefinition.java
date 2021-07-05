@@ -17,6 +17,7 @@ import io.trino.spi.type.TypeId;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.StringJoiner;
 
@@ -50,11 +51,11 @@ public class ConnectorMaterializedViewDefinition
         this.columns = List.copyOf(requireNonNull(columns, "columns is null"));
         this.comment = requireNonNull(comment, "comment is null");
         this.owner = requireNonNull(owner, "owner is null");
+        this.properties = requireNonNull(properties, "properties are null");
 
         if (catalog.isEmpty() && schema.isPresent()) {
             throw new IllegalArgumentException("catalog must be present if schema is present");
         }
-        this.properties = requireNonNull(properties, "properties are null");
         if (columns.isEmpty()) {
             throw new IllegalArgumentException("columns list is empty");
         }
@@ -115,6 +116,32 @@ public class ConnectorMaterializedViewDefinition
         return getClass().getSimpleName() + joiner.toString();
     }
 
+    @Override
+    public boolean equals(Object o)
+    {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        ConnectorMaterializedViewDefinition that = (ConnectorMaterializedViewDefinition) o;
+        return Objects.equals(originalSql, that.originalSql) &&
+                Objects.equals(storageTable, that.storageTable) &&
+                Objects.equals(catalog, that.catalog) &&
+                Objects.equals(schema, that.schema) &&
+                Objects.equals(columns, that.columns) &&
+                Objects.equals(comment, that.comment) &&
+                Objects.equals(owner, that.owner) &&
+                Objects.equals(properties, that.properties);
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(originalSql, storageTable, catalog, schema, columns, comment, owner, properties);
+    }
+
     public static final class Column
     {
         private final String name;
@@ -140,6 +167,26 @@ public class ConnectorMaterializedViewDefinition
         public String toString()
         {
             return name + " " + type;
+        }
+
+        @Override
+        public boolean equals(Object o)
+        {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            Column column = (Column) o;
+            return Objects.equals(name, column.name) &&
+                    Objects.equals(type, column.type);
+        }
+
+        @Override
+        public int hashCode()
+        {
+            return Objects.hash(name, type);
         }
     }
 }

@@ -301,7 +301,7 @@ public class SqlServerClient
         }
 
         // TODO (https://github.com/trinodb/trino/issues/4593) implement proper type mapping
-        return legacyToPrestoType(session, connection, typeHandle);
+        return legacyColumnMapping(session, connection, typeHandle);
     }
 
     @Override
@@ -486,7 +486,7 @@ public class SqlServerClient
     }
 
     @Override
-    public boolean isTopNLimitGuaranteed(ConnectorSession session)
+    public boolean isTopNGuaranteed(ConnectorSession session)
     {
         return true;
     }

@@ -76,6 +76,12 @@ public abstract class AbstractTestDistributedQueries
         return true;
     }
 
+    private boolean supportsDropSchema()
+    {
+        // A connector either supports CREATE SCHEMA and DROP SCHEMA or none of them.
+        return supportsCreateSchema();
+    }
+
     protected boolean supportsCreateTable()
     {
         return true;
@@ -610,10 +616,7 @@ public abstract class AbstractTestDistributedQueries
     @Test
     public void testDelete()
     {
-        if (!supportsDelete()) {
-            assertQueryFails("DELETE FROM nation", "This connector does not support deletes");
-            return;
-        }
+        skipTestUnlessSupportsDeletes();
 
         String tableName = "test_delete_" + randomTableSuffix();
 
@@ -656,10 +659,7 @@ public abstract class AbstractTestDistributedQueries
     @Test
     public void testDeleteWithComplexPredicate()
     {
-        if (!supportsDelete()) {
-            assertQueryFails("DELETE FROM nation", "This connector does not support deletes");
-            return;
-        }
+        skipTestUnlessSupportsDeletes();
 
         String tableName = "test_delete_" + randomTableSuffix();
         assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM orders", "SELECT count(*) FROM orders");
@@ -679,10 +679,7 @@ public abstract class AbstractTestDistributedQueries
     @Test
     public void testDeleteWithSubquery()
     {
-        if (!supportsDelete()) {
-            assertQueryFails("DELETE FROM nation", "This connector does not support deletes");
-            return;
-        }
+        skipTestUnlessSupportsDeletes();
 
         String tableName = "test_delete_" + randomTableSuffix();
 
@@ -708,10 +705,7 @@ public abstract class AbstractTestDistributedQueries
     @Test
     public void testDeleteWithSemiJoin()
     {
-        if (!supportsDelete()) {
-            assertQueryFails("DELETE FROM nation", "This connector does not support deletes");
-            return;
-        }
+        skipTestUnlessSupportsDeletes();
 
         String tableName = "test_delete_" + randomTableSuffix();
 
@@ -750,10 +744,7 @@ public abstract class AbstractTestDistributedQueries
     @Test
     public void testDeleteWithVarcharPredicate()
     {
-        if (!supportsDelete()) {
-            assertQueryFails("DELETE FROM nation", "This connector does not support deletes");
-            return;
-        }
+        skipTestUnlessSupportsDeletes();
 
         String tableName = "test_delete_" + randomTableSuffix();
         assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM orders", "SELECT count(*) FROM orders");
@@ -762,6 +753,17 @@ public abstract class AbstractTestDistributedQueries
         assertQuery("SELECT * FROM " + tableName, "SELECT * FROM orders WHERE orderstatus <> 'O'");
 
         assertUpdate("DROP TABLE " + tableName);
+    }
+
+    protected void skipTestUnlessSupportsDeletes()
+    {
+        skipTestUnless(supportsCreateTable());
+        try (TestTable table = new TestTable(getQueryRunner()::execute, "test_delete", "(col varchar(1))", ImmutableList.of("'a'", "'A'"))) {
+            if (!supportsDelete()) {
+                assertQueryFails("DELETE FROM " + table.getName(), "This connector does not support deletes");
+                throw new SkipException("This connector does not support deletes");
+            }
+        }
     }
 
     @Test
@@ -1095,6 +1097,14 @@ public abstract class AbstractTestDistributedQueries
     }
 
     @Test
+    public void testShowCreateSchema()
+    {
+        String schemaName = getSession().getSchema().orElseThrow();
+        assertThat((String) computeScalar("SHOW CREATE SCHEMA " + schemaName))
+                .isEqualTo(format("CREATE SCHEMA %s.%s", getSession().getCatalog().orElseThrow(), schemaName));
+    }
+
+    @Test
     public void testCreateSchema()
     {
         String schemaName = "test_schema_create_" + randomTableSuffix();
@@ -1104,10 +1114,37 @@ public abstract class AbstractTestDistributedQueries
         }
         assertThat(computeActual("SHOW SCHEMAS").getOnlyColumnAsSet()).doesNotContain(schemaName);
         assertUpdate("CREATE SCHEMA " + schemaName);
+
+        // verify listing of new schema
         assertThat(computeActual("SHOW SCHEMAS").getOnlyColumnAsSet()).contains(schemaName);
+
+        // verify SHOW CREATE SCHEMA works
+        assertThat((String) computeScalar("SHOW CREATE SCHEMA " + schemaName))
+                .startsWith(format("CREATE SCHEMA %s.%s", getSession().getCatalog().orElseThrow(), schemaName));
+
+        // try to create duplicate schema
         assertQueryFails("CREATE SCHEMA " + schemaName, format("line 1:1: Schema '.*\\.%s' already exists", schemaName));
+
+        // cleanup
         assertUpdate("DROP SCHEMA " + schemaName);
+
+        // verify DROP SCHEMA for non-existing schema
         assertQueryFails("DROP SCHEMA " + schemaName, format("line 1:1: Schema '.*\\.%s' does not exist", schemaName));
+    }
+
+    @Test
+    public void testDropNonEmptySchema()
+    {
+        String schemaName = "test_drop_non_empty_schema_" + randomTableSuffix();
+        if (!supportsDropSchema()) {
+            return;
+        }
+
+        assertUpdate("CREATE SCHEMA " + schemaName);
+        assertUpdate("CREATE TABLE " + schemaName + ".t(x int)");
+        assertQueryFails("DROP SCHEMA " + schemaName, ".*Cannot drop non-empty schema '\\Q" + schemaName + "\\E'");
+        assertUpdate("DROP TABLE " + schemaName + ".t");
+        assertUpdate("DROP SCHEMA " + schemaName);
     }
 
     @Test
@@ -1180,7 +1217,7 @@ public abstract class AbstractTestDistributedQueries
         return false;
     }
 
-    private static boolean requiresDelimiting(String identifierName)
+    protected static boolean requiresDelimiting(String identifierName)
     {
         return !identifierName.matches("[a-zA-Z][a-zA-Z0-9_]*");
     }

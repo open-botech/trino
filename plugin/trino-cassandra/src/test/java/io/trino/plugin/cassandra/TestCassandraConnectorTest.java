@@ -99,12 +99,20 @@ public class TestCassandraConnectorTest
             case SUPPORTS_ARRAY:
                 return false;
 
+            case SUPPORTS_ADD_COLUMN:
+            case SUPPORTS_DROP_COLUMN:
+            case SUPPORTS_RENAME_COLUMN:
+                return false;
+
             case SUPPORTS_COMMENT_ON_TABLE:
             case SUPPORTS_COMMENT_ON_COLUMN:
                 return false;
 
             case SUPPORTS_TOPN_PUSHDOWN:
                 return false;
+
+            case SUPPORTS_DELETE:
+                return true;
 
             default:
                 return super.hasBehavior(connectorBehavior);
@@ -157,29 +165,6 @@ public class TestCassandraConnectorTest
     protected String dataMappingTableName(String trinoTypeName)
     {
         return "tmp_trino_" + System.nanoTime();
-    }
-
-    @Test
-    @Override
-    public void testAddColumn()
-    {
-        assertThatThrownBy(super::testAddColumn).hasMessage("This connector does not support adding columns");
-        throw new SkipException("This connector does not support adding columns");
-    }
-
-    @Override
-    public void testRenameColumn()
-    {
-        assertThatThrownBy(super::testRenameColumn).hasMessage("This connector does not support renaming columns");
-        throw new SkipException("This connector does not support renaming columns");
-    }
-
-    @Test
-    @Override
-    public void testDropColumn()
-    {
-        assertThatThrownBy(super::testDropColumn).hasMessage("This connector does not support dropping columns");
-        throw new SkipException("This connector does not support dropping columns");
     }
 
     @Test
@@ -851,34 +836,34 @@ public class TestCassandraConnectorTest
     public void testDeleteWithComplexPredicate()
     {
         assertThatThrownBy(super::testDeleteWithComplexPredicate)
-                .hasStackTraceContaining("Deleting without partition key is not supported");
+                .hasStackTraceContaining("Delete without primary key or partition key is not supported");
     }
 
     @Override
     public void testDeleteWithSemiJoin()
     {
         assertThatThrownBy(super::testDeleteWithSemiJoin)
-                .hasStackTraceContaining("Deleting without partition key is not supported");
+                .hasStackTraceContaining("Delete without primary key or partition key is not supported");
     }
 
     @Override
     public void testDeleteWithSubquery()
     {
         assertThatThrownBy(super::testDeleteWithSubquery)
-                .hasStackTraceContaining("Deleting without partition key is not supported");
+                .hasStackTraceContaining("Delete without primary key or partition key is not supported");
     }
 
     @Override
     public void testDeleteWithVarcharPredicate()
     {
         assertThatThrownBy(super::testDeleteWithVarcharPredicate)
-                .hasStackTraceContaining("Deleting without partition key is not supported");
+                .hasStackTraceContaining("Delete without primary key or partition key is not supported");
     }
 
     @Override
-    public void testDeleteAllTable()
+    public void testDeleteAllDataFromTable()
     {
-        assertThatThrownBy(super::testDeleteAllTable)
+        assertThatThrownBy(super::testDeleteAllDataFromTable)
                 .hasStackTraceContaining("Deleting without partition key is not supported");
     }
 
@@ -886,7 +871,7 @@ public class TestCassandraConnectorTest
     public void testRowLevelDelete()
     {
         assertThatThrownBy(super::testRowLevelDelete)
-                .hasStackTraceContaining("Deleting without partition key is not supported");
+                .hasStackTraceContaining("Delete without primary key or partition key is not supported");
     }
 
     private void assertSelect(String tableName, boolean createdByTrino)

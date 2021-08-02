@@ -34,6 +34,7 @@ import io.trino.plugin.hive.parquet.ParquetWriterConfig;
 import io.trino.plugin.hive.rcfile.RcFilePageSourceFactory;
 import io.trino.plugin.hive.s3select.S3SelectRecordCursorProvider;
 import io.trino.plugin.hive.s3select.TrinoS3ClientFactory;
+import io.trino.plugin.hive.security.SystemTableAwareAccessControl;
 import io.trino.spi.connector.ConnectorNodePartitioningProvider;
 import io.trino.spi.connector.ConnectorPageSinkProvider;
 import io.trino.spi.connector.ConnectorPageSourceProvider;
@@ -82,6 +83,10 @@ public class HiveModule
         newSetBinder(binder, EventClient.class).addBinding().to(HiveEventClient.class).in(Scopes.SINGLETON);
         binder.bind(HivePartitionManager.class).in(Scopes.SINGLETON);
         binder.bind(LocationService.class).to(HiveLocationService.class).in(Scopes.SINGLETON);
+        Multibinder<SystemTableProvider> systemTableProviders = newSetBinder(binder, SystemTableProvider.class);
+        systemTableProviders.addBinding().to(PartitionsSystemTableProvider.class).in(Scopes.SINGLETON);
+        systemTableProviders.addBinding().to(PropertiesSystemTableProvider.class).in(Scopes.SINGLETON);
+        binder.bind(SystemTableAwareAccessControl.class).in(Scopes.SINGLETON);
         newOptionalBinder(binder, HiveRedirectionsProvider.class)
                 .setDefault().to(NoneHiveRedirectionsProvider.class).in(Scopes.SINGLETON);
         newOptionalBinder(binder, HiveMaterializedViewMetadataFactory.class)

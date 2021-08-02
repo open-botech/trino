@@ -32,6 +32,7 @@ import io.trino.spi.connector.JoinType;
 import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.TableNotFoundException;
 import io.trino.spi.predicate.TupleDomain;
+import io.trino.spi.security.ConnectorIdentity;
 import io.trino.spi.statistics.TableStatistics;
 import io.trino.spi.type.CharType;
 import io.trino.spi.type.DecimalType;
@@ -59,6 +60,7 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static com.google.common.base.Verify.verify;
@@ -66,6 +68,7 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.trino.plugin.jdbc.JdbcErrorCode.JDBC_ERROR;
+import static io.trino.plugin.jdbc.JdbcMetadataSessionProperties.isNonTransactionalInsert;
 import static io.trino.plugin.jdbc.PredicatePushdownController.DISABLE_PUSHDOWN;
 import static io.trino.plugin.jdbc.StandardColumnMappings.bigintWriteFunction;
 import static io.trino.plugin.jdbc.StandardColumnMappings.booleanWriteFunction;
@@ -203,7 +206,7 @@ public abstract class BaseJdbcClient
     public List<SchemaTableName> getTableNames(ConnectorSession session, Optional<String> schema)
     {
         try (Connection connection = connectionFactory.openConnection(session)) {
-            JdbcIdentity identity = JdbcIdentity.from(session);
+            ConnectorIdentity identity = session.getIdentity();
             Optional<String> remoteSchema = schema.map(schemaName -> identifierMapping.toRemoteSchemaName(identity, connection, schemaName));
             if (remoteSchema.isPresent() && !filterSchema(remoteSchema.get())) {
                 return ImmutableList.of();
@@ -231,7 +234,7 @@ public abstract class BaseJdbcClient
     public Optional<JdbcTableHandle> getTableHandle(ConnectorSession session, SchemaTableName schemaTableName)
     {
         try (Connection connection = connectionFactory.openConnection(session)) {
-            JdbcIdentity identity = JdbcIdentity.from(session);
+            ConnectorIdentity identity = session.getIdentity();
             String remoteSchema = identifierMapping.toRemoteSchemaName(identity, connection, schemaTableName.getSchemaName());
             String remoteTable = identifierMapping.toRemoteTableName(identity, connection, remoteSchema, schemaTableName.getTableName());
             try (ResultSet resultSet = getTables(connection, Optional.of(remoteSchema), Optional.of(remoteTable))) {
@@ -536,7 +539,7 @@ public abstract class BaseJdbcClient
     {
         SchemaTableName schemaTableName = tableMetadata.getTable();
 
-        JdbcIdentity identity = JdbcIdentity.from(session);
+        ConnectorIdentity identity = session.getIdentity();
         if (!getSchemaNames(session).contains(schemaTableName.getSchemaName())) {
             throw new TrinoException(NOT_FOUND, "Schema not found: " + schemaTableName.getSchemaName());
         }
@@ -594,12 +597,11 @@ public abstract class BaseJdbcClient
     public JdbcOutputTableHandle beginInsertTable(ConnectorSession session, JdbcTableHandle tableHandle, List<JdbcColumnHandle> columns)
     {
         SchemaTableName schemaTableName = tableHandle.asPlainTable().getSchemaTableName();
-        JdbcIdentity identity = JdbcIdentity.from(session);
+        ConnectorIdentity identity = session.getIdentity();
 
         try (Connection connection = connectionFactory.openConnection(session)) {
             String remoteSchema = identifierMapping.toRemoteSchemaName(identity, connection, schemaTableName.getSchemaName());
             String remoteTable = identifierMapping.toRemoteTableName(identity, connection, remoteSchema, schemaTableName.getTableName());
-            String remoteTemporaryTableName = identifierMapping.toRemoteTableName(identity, connection, remoteSchema, generateTemporaryTableName());
             String catalog = connection.getCatalog();
 
             ImmutableList.Builder<String> columnNames = ImmutableList.builder();
@@ -611,6 +613,18 @@ public abstract class BaseJdbcClient
                 jdbcColumnTypes.add(column.getJdbcTypeHandle());
             }
 
+            if (isNonTransactionalInsert(session)) {
+                return new JdbcOutputTableHandle(
+                        catalog,
+                        remoteSchema,
+                        remoteTable,
+                        columnNames.build(),
+                        columnTypes.build(),
+                        Optional.of(jdbcColumnTypes.build()),
+                        remoteTable);
+            }
+
+            String remoteTemporaryTableName = identifierMapping.toRemoteTableName(identity, connection, remoteSchema, generateTemporaryTableName());
             copyTableSchema(connection, catalog, remoteSchema, remoteTable, remoteTemporaryTableName, columnNames.build());
 
             return new JdbcOutputTableHandle(
@@ -666,7 +680,7 @@ public abstract class BaseJdbcClient
         try (Connection connection = connectionFactory.openConnection(session)) {
             String newSchemaName = newTable.getSchemaName();
             String newTableName = newTable.getTableName();
-            JdbcIdentity identity = JdbcIdentity.from(session);
+            ConnectorIdentity identity = session.getIdentity();
             String newRemoteSchemaName = identifierMapping.toRemoteSchemaName(identity, connection, newSchemaName);
             String newRemoteTableName = identifierMapping.toRemoteTableName(identity, connection, newRemoteSchemaName, newTableName);
             String sql = format(
@@ -683,6 +697,11 @@ public abstract class BaseJdbcClient
     @Override
     public void finishInsertTable(ConnectorSession session, JdbcOutputTableHandle handle)
     {
+        if (isNonTransactionalInsert(session)) {
+            checkState(handle.getTemporaryTableName().equals(handle.getTableName()), "Unexpected use of temporary table when non transactional inserts are enabled");
+            return;
+        }
+
         RemoteTableName temporaryTable = new RemoteTableName(
                 Optional.ofNullable(handle.getCatalogName()),
                 Optional.ofNullable(handle.getSchemaName()),
@@ -839,7 +858,7 @@ public abstract class BaseJdbcClient
     @Override
     public void createSchema(ConnectorSession session, String schemaName)
     {
-        JdbcIdentity identity = JdbcIdentity.from(session);
+        ConnectorIdentity identity = session.getIdentity();
         try (Connection connection = connectionFactory.openConnection(session)) {
             schemaName = identifierMapping.toRemoteSchemaName(identity, connection, schemaName);
             execute(connection, createSchemaSql(schemaName));
@@ -857,7 +876,7 @@ public abstract class BaseJdbcClient
     @Override
     public void dropSchema(ConnectorSession session, String schemaName)
     {
-        JdbcIdentity identity = JdbcIdentity.from(session);
+        ConnectorIdentity identity = session.getIdentity();
         try (Connection connection = connectionFactory.openConnection(session)) {
             schemaName = identifierMapping.toRemoteSchemaName(identity, connection, schemaName);
             execute(connection, dropSchemaSql(schemaName));

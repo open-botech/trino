@@ -13,6 +13,7 @@
  */
 package io.trino.operator;
 
+import com.google.common.base.Suppliers;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
 import io.trino.Session;
@@ -20,6 +21,7 @@ import io.trino.memory.context.MemoryTrackingContext;
 import io.trino.metadata.Split;
 import io.trino.spi.Page;
 import io.trino.spi.connector.UpdatablePageSource;
+import io.trino.spi.metrics.Metrics;
 import io.trino.sql.planner.plan.PlanNodeId;
 
 import java.util.ArrayList;
@@ -102,7 +104,7 @@ public class WorkProcessorSourceOperatorAdapter
 
         Object splitInfo = split.getInfo();
         if (splitInfo != null) {
-            operatorContext.setInfoSupplier(() -> new SplitOperatorInfo(split.getCatalogName(), splitInfo));
+            operatorContext.setInfoSupplier(Suppliers.ofInstance(new SplitOperatorInfo(split.getCatalogName(), splitInfo)));
         }
 
         splitBuffer.add(split);
@@ -122,7 +124,7 @@ public class WorkProcessorSourceOperatorAdapter
     }
 
     @Override
-    public ListenableFuture<?> isBlocked()
+    public ListenableFuture<Void> isBlocked()
     {
         if (!pages.isBlocked()) {
             return NOT_BLOCKED;
@@ -174,6 +176,7 @@ public class WorkProcessorSourceOperatorAdapter
     public void close()
             throws Exception
     {
+        operatorContext.setLatestMetrics(sourceOperator.getConnectorMetrics());
         sourceOperator.close();
     }
 
@@ -190,6 +193,7 @@ public class WorkProcessorSourceOperatorAdapter
         long currentInputPositions = sourceOperator.getInputPositions();
 
         long currentDynamicFilterSplitsProcessed = sourceOperator.getDynamicFilterSplitsProcessed();
+        Metrics currentMetrics = sourceOperator.getConnectorMetrics();
 
         if (currentPhysicalInputBytes != previousPhysicalInputBytes
                 || currentPhysicalInputPositions != previousPhysicalInputPositions
@@ -228,6 +232,8 @@ public class WorkProcessorSourceOperatorAdapter
             operatorContext.recordDynamicFilterSplitProcessed(currentDynamicFilterSplitsProcessed - previousDynamicFilterSplitsProcessed);
             previousDynamicFilterSplitsProcessed = currentDynamicFilterSplitsProcessed;
         }
+
+        operatorContext.setLatestMetrics(currentMetrics);
     }
 
     private static class SplitBuffer
@@ -235,7 +241,7 @@ public class WorkProcessorSourceOperatorAdapter
     {
         private final List<Split> pendingSplits = new ArrayList<>();
 
-        private SettableFuture<?> blockedOnSplits = SettableFuture.create();
+        private SettableFuture<Void> blockedOnSplits = SettableFuture.create();
         private boolean noMoreSplits;
 
         @Override

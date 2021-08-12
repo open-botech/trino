@@ -82,7 +82,7 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static com.google.common.util.concurrent.Futures.immediateFuture;
+import static com.google.common.util.concurrent.Futures.immediateVoidFuture;
 import static io.airlift.http.client.FullJsonResponseHandler.createFullJsonResponseHandler;
 import static io.airlift.http.client.HttpUriBuilder.uriBuilderFrom;
 import static io.airlift.http.client.Request.Builder.prepareDelete;
@@ -137,7 +137,7 @@ public final class HttpRemoteTask
     private final Map<PlanNodeId, Boolean> noMoreSplits = new HashMap<>();
     @GuardedBy("this")
     private final AtomicReference<OutputBuffers> outputBuffers = new AtomicReference<>();
-    private final FutureStateChange<?> whenSplitQueueHasSpace = new FutureStateChange<>();
+    private final FutureStateChange<Void> whenSplitQueueHasSpace = new FutureStateChange<>();
     @GuardedBy("this")
     private boolean splitQueueHasSpace = true;
     @GuardedBy("this")
@@ -446,7 +446,7 @@ public final class HttpRemoteTask
     }
 
     @Override
-    public synchronized ListenableFuture<?> whenSplitQueueHasSpace(int threshold)
+    public synchronized ListenableFuture<Void> whenSplitQueueHasSpace(int threshold)
     {
         if (whenSplitQueueHasSpaceThreshold.isPresent()) {
             checkArgument(threshold == whenSplitQueueHasSpaceThreshold.getAsInt(), "Multiple split queue space notification thresholds not supported");
@@ -456,7 +456,7 @@ public final class HttpRemoteTask
             updateSplitQueueSpace();
         }
         if (splitQueueHasSpace) {
-            return immediateFuture(null);
+            return immediateVoidFuture();
         }
         return whenSplitQueueHasSpace.createNewListener();
     }
@@ -520,12 +520,13 @@ public final class HttpRemoteTask
         }
 
         // if there is a request already running, wait for it to complete
-        if (this.currentRequest != null && !this.currentRequest.isDone()) {
+        // currentRequest is always cleared when request is complete
+        if (currentRequest != null) {
             return;
         }
 
         // if throttled due to error, asynchronously wait for timeout and try again
-        ListenableFuture<?> errorRateLimit = updateErrorTracker.acquireRequestPermit();
+        ListenableFuture<Void> errorRateLimit = updateErrorTracker.acquireRequestPermit();
         if (!errorRateLimit.isDone()) {
             errorRateLimit.addListener(this::sendUpdate, executor);
             return;

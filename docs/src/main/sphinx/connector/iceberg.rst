@@ -8,7 +8,8 @@ Overview
 Apache Iceberg is an open table format for huge analytic datasets.
 The Iceberg connector allows querying data stored in
 files written in Iceberg format, as defined in the
-`Iceberg Table Spec <https://iceberg.apache.org/spec/>`_.
+`Iceberg Table Spec <https://iceberg.apache.org/spec/>`_. It supports Apache
+Iceberg table spec version 1.
 
 The Iceberg table state is maintained in metadata files. All changes to table state
 create a new metadata file and replace the old metadata with an atomic swap.
@@ -28,6 +29,17 @@ and then read metadata from each data file.
 
 Since Iceberg stores the paths to data files in the metadata files, it
 only consults the underlying file system for files that must be read.
+
+Requirements
+------------
+
+To use Iceberg, you need:
+
+* Network access from the Trino coordinator and workers to the distributed
+  object storage.
+* Access to a Hive metastore service (HMS).
+* Network access from the Trino coordinator to the HMS. Hive
+  metastore access with the Thrift protocol defaults to using port 9083.
 
 Configuration
 -------------
@@ -102,7 +114,7 @@ Transform                             Description
 In this example, the table is partitioned by the month of ``order_date``, a hash of
 ``account_number`` (with 10 buckets), and ``country``::
 
-    CREATE TABLE iceberg.testdb.sample_partitioned (
+    CREATE TABLE iceberg.testdb.customer_orders (
         order_id BIGINT,
         order_date DATE,
         account_number BIGINT,
@@ -118,14 +130,14 @@ partitions if the ``WHERE`` clause specifies filters only on the identity-transf
 partitioning columns, that can match entire partitions. Given the table definition
 above, this SQL will delete all partitions for which ``country`` is ``US``::
 
-    DELETE FROM iceberg.testdb.sample_partitioned
+    DELETE FROM iceberg.testdb.customer_orders
     WHERE country = 'US'
 
 Currently, the Iceberg connector only supports deletion by partition.
 This SQL below will fail because the ``WHERE`` clause selects only some of the rows
 in the partition::
 
-    DELETE FROM iceberg.testdb.sample_partitioned
+    DELETE FROM iceberg.testdb.customer_orders
     WHERE country = 'US' AND customer = 'Freds Foods'
 
 Rolling back to a previous snapshot
@@ -136,14 +148,14 @@ identified by an snapshot IDs.
 
 The connector provides a system snapshots table for each Iceberg table.  Snapshots are
 identified by BIGINT snapshot IDs.  You can find the latest snapshot ID for table
-``customer_accounts`` by running the following command::
+``customer_orders`` by running the following command::
 
-    SELECT snapshot_id FROM "customer_accounts$snapshots" ORDER BY committed_at DESC LIMIT 1
+    SELECT snapshot_id FROM iceberg.testdb."customer_orders$snapshots" ORDER BY committed_at DESC LIMIT 1
 
 A SQL procedure ``system.rollback_to_snapshot`` allows the caller to roll back
 the state of the table to a previous snapshot id::
 
-    CALL system.rollback_to_snapshot(schema_name, table_name, snapshot_id)
+    CALL iceberg.system.rollback_to_snapshot('testdb', 'customer_orders', 8954597067493422955)
 
 Schema evolution
 ----------------
@@ -157,14 +169,14 @@ Migrating existing tables
 -------------------------
 
 The connector can read from or write to Hive tables that have been migrated to Iceberg.
-Currently, there is no Trino support to migrate Hive tables to Trino, so you will
-need to use either the Iceberg API or Spark.
+There is no Trino support for migrating Hive tables to Iceberg, so you need to either use
+the Iceberg API or Apache Spark.
 
 System tables and columns
 -------------------------
 
-The connector supports queries of the table partitions.  Given a table ``customer_accounts``,
-``SELECT * FROM customer_acccounts$partitions`` shows the table partitions, including the minimum
+The connector supports queries of the table partitions.  Given a table ``customer_orders``,
+``SELECT * FROM iceberg.testdb."customer_orders$partitions"`` shows the table partitions, including the minimum
 and maximum values for the partition columns.
 
 Iceberg table properties

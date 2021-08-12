@@ -6,6 +6,15 @@ The Oracle connector allows querying and creating tables in an external Oracle
 database. Connectors let Trino join data provided by different databases,
 like Oracle and Hive, or different Oracle database instances.
 
+Requirements
+------------
+
+To connect to Oracle, you need:
+
+* Oracle 12 or higher.
+* Network access from the Trino coordinator and workers to Oracle.
+  Port 1521 is the default port.
+
 Configuration
 -------------
 

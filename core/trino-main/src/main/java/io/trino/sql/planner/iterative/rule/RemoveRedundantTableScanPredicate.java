@@ -40,7 +40,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-import static com.google.common.base.Preconditions.checkState;
 import static io.trino.matching.Capture.newCapture;
 import static io.trino.sql.ExpressionUtils.filterDeterministicConjuncts;
 import static io.trino.sql.ExpressionUtils.filterNonDeterministicConjuncts;
@@ -117,7 +116,7 @@ public class RemoveRedundantTableScanPredicate
                 types);
 
         TupleDomain<ColumnHandle> predicateDomain = decomposedPredicate.getTupleDomain()
-                .transform(node.getAssignments()::get);
+                .transformKeys(node.getAssignments()::get);
 
         if (predicateDomain.isNone()) {
             // TODO: DomainTranslator.fromPredicate can infer that the expression is "false" in some cases (TupleDomain.none()).
@@ -126,9 +125,12 @@ public class RemoveRedundantTableScanPredicate
             return new ValuesNode(node.getId(), node.getOutputSymbols(), ImmutableList.of());
         }
 
-        // table scans with none domain should be converted to ValuesNode
-        checkState(node.getEnforcedConstraint().getDomains().isPresent());
-        Map<ColumnHandle, Domain> enforcedColumnDomains = node.getEnforcedConstraint().getDomains().get();
+        if (node.getEnforcedConstraint().isNone()) {
+            // table scans with none domain should be converted to ValuesNode
+            return new ValuesNode(node.getId(), node.getOutputSymbols(), ImmutableList.of());
+        }
+
+        Map<ColumnHandle, Domain> enforcedColumnDomains = node.getEnforcedConstraint().getDomains().orElseThrow(); // is not NONE
 
         TupleDomain<ColumnHandle> unenforcedDomain = predicateDomain.transformDomains((columnHandle, predicateColumnDomain) -> {
             Type type = predicateColumnDomain.getType();
@@ -143,7 +145,7 @@ public class RemoveRedundantTableScanPredicate
         Map<ColumnHandle, Symbol> assignments = ImmutableBiMap.copyOf(node.getAssignments()).inverse();
         Expression resultingPredicate = createResultingPredicate(
                 metadata,
-                domainTranslator.toPredicate(unenforcedDomain.transform(assignments::get)),
+                domainTranslator.toPredicate(unenforcedDomain.transformKeys(assignments::get)),
                 nonDeterministicPredicate,
                 decomposedPredicate.getRemainingExpression());
 

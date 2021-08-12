@@ -209,6 +209,10 @@ public final class ElasticsearchQueryBuilder
             }
             queryBuilder.should(rangeQueryBuilder);
         }
+
+        if (domain.isNullAllowed()) {
+            queryBuilder.should(new BoolQueryBuilder().mustNot(new ExistsQueryBuilder(columnName)));
+        }
         return queryBuilder;
     }
 

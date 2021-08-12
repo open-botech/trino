@@ -35,6 +35,7 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.Set;
 
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -106,7 +107,10 @@ public interface JdbcClient
 
     boolean supportsTopN(ConnectorSession session, JdbcTableHandle handle, List<JdbcSortItem> sortOrder);
 
-    boolean isTopNLimitGuaranteed(ConnectorSession session);
+    /**
+     * Reports whether result cardinality and ordering is guaranteed when {@link #supportsTopN(ConnectorSession, JdbcTableHandle, List)} returns true.
+     */
+    boolean isTopNGuaranteed(ConnectorSession session);
 
     boolean supportsLimit();
 
@@ -168,4 +172,6 @@ public interface JdbcClient
     {
         return Optional.empty();
     }
+
+    OptionalLong delete(ConnectorSession session, JdbcTableHandle handle);
 }

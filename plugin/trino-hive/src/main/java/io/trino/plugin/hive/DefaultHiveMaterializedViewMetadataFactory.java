@@ -19,7 +19,7 @@ public class DefaultHiveMaterializedViewMetadataFactory
     private static final HiveMaterializedViewMetadata NONE = new NoneHiveMaterializedViewMetadata();
 
     @Override
-    public HiveMaterializedViewMetadata create()
+    public HiveMaterializedViewMetadata create(HiveMetastoreClosure hiveMetastoreClosure)
     {
         return NONE;
     }

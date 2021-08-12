@@ -13,8 +13,7 @@
  */
 package io.trino.plugin.druid;
 
-import io.trino.Session;
-import io.trino.plugin.jdbc.JdbcMetadataConfig;
+import io.trino.plugin.jdbc.BaseJdbcConnectorTest;
 import io.trino.plugin.jdbc.JdbcTableHandle;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.SchemaTableName;
@@ -23,24 +22,24 @@ import io.trino.sql.planner.plan.AggregationNode;
 import io.trino.sql.planner.plan.JoinNode;
 import io.trino.sql.planner.plan.TableScanNode;
 import io.trino.sql.planner.plan.TopNNode;
-import io.trino.testing.BaseConnectorTest;
 import io.trino.testing.MaterializedResult;
 import io.trino.testing.TestingConnectorBehavior;
 import io.trino.testing.assertions.Assert;
+import io.trino.testing.sql.SqlExecutor;
 import org.intellij.lang.annotations.Language;
 import org.testng.annotations.AfterClass;
 import org.testng.annotations.Test;
 
-import static com.google.common.base.Verify.verify;
 import static io.trino.plugin.druid.DruidQueryRunner.copyAndIngestTpchData;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 import static io.trino.sql.planner.assertions.PlanMatchPattern.anyTree;
 import static io.trino.sql.planner.assertions.PlanMatchPattern.node;
 import static io.trino.testing.MaterializedResult.resultBuilder;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public abstract class BaseDruidConnectorTest
-        extends BaseConnectorTest
+        extends BaseJdbcConnectorTest
 {
     protected static final String SELECT_FROM_ORDERS = "SELECT " +
             "orderdate, " +
@@ -138,10 +137,38 @@ public abstract class BaseDruidConnectorTest
             case SUPPORTS_COMMENT_ON_COLUMN:
             case SUPPORTS_COMMENT_ON_TABLE:
             case SUPPORTS_TOPN_PUSHDOWN:
+            case SUPPORTS_AGGREGATION_PUSHDOWN:
                 return false;
             default:
                 return super.hasBehavior(connectorBehavior);
         }
+    }
+
+    @Override
+    public void testDeleteWithVarcharEqualityPredicate()
+    {
+        assertThatThrownBy(() -> super.testDeleteWithVarcharEqualityPredicate())
+                .hasMessage("This connector does not support creating tables");
+    }
+
+    @Override
+    public void testDeleteWithVarcharInequalityPredicate()
+    {
+        assertThatThrownBy(() -> super.testDeleteWithVarcharInequalityPredicate())
+                .hasMessage("This connector does not support creating tables");
+    }
+
+    @Override
+    public void testDeleteWithVarcharGreaterAndLowerPredicate()
+    {
+        assertThatThrownBy(() -> super.testDeleteWithVarcharGreaterAndLowerPredicate())
+                .hasMessage("This connector does not support creating tables");
+    }
+
+    @Override
+    protected SqlExecutor onRemoteDatabase()
+    {
+        return druidServer::execute;
     }
 
     @Test
@@ -341,14 +368,5 @@ public abstract class BaseDruidConnectorTest
                         "LEFT JOIN region r USING (regionkey) " +
                         "LIMIT 30"))
                 .isNotFullyPushedDown(joinOverTableScans);
-    }
-
-    protected Session joinPushdownEnabled(Session session)
-    {
-        // If join pushdown gets enabled by default, tests should use default session
-        verify(!new JdbcMetadataConfig().isJoinPushdownEnabled());
-        return Session.builder(session)
-                .setCatalogSessionProperty(session.getCatalog().orElseThrow(), "join_pushdown_enabled", "true")
-                .build();
     }
 }

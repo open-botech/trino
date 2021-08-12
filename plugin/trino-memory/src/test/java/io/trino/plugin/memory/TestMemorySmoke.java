@@ -13,13 +13,18 @@
  */
 package io.trino.plugin.memory;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Ints;
 import io.trino.Session;
 import io.trino.execution.QueryStats;
 import io.trino.metadata.QualifiedObjectName;
 import io.trino.operator.OperatorStats;
+import io.trino.plugin.base.metrics.LongCount;
 import io.trino.spi.QueryId;
+import io.trino.spi.metrics.Count;
+import io.trino.spi.metrics.Metric;
+import io.trino.spi.metrics.Metrics;
 import io.trino.sql.analyzer.FeaturesConfig;
 import io.trino.testing.AbstractTestQueryFramework;
 import io.trino.testing.DistributedQueryRunner;
@@ -32,16 +37,24 @@ import org.intellij.lang.annotations.Language;
 import org.testng.annotations.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.trino.SystemSessionProperties.ENABLE_LARGE_DYNAMIC_FILTERS;
 import static io.trino.SystemSessionProperties.JOIN_DISTRIBUTION_TYPE;
 import static io.trino.SystemSessionProperties.JOIN_REORDERING_STRATEGY;
+import static io.trino.plugin.memory.MemoryQueryRunner.createMemoryQueryRunner;
 import static io.trino.sql.analyzer.FeaturesConfig.JoinDistributionType.BROADCAST;
 import static io.trino.sql.analyzer.FeaturesConfig.JoinDistributionType.PARTITIONED;
 import static io.trino.sql.analyzer.FeaturesConfig.JoinReorderingStrategy.NONE;
 import static io.trino.testing.assertions.Assert.assertEquals;
+import static io.trino.tpch.TpchTable.CUSTOMER;
+import static io.trino.tpch.TpchTable.LINE_ITEM;
+import static io.trino.tpch.TpchTable.NATION;
+import static io.trino.tpch.TpchTable.ORDERS;
+import static io.trino.tpch.TpchTable.PART;
 import static java.lang.String.format;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.testng.Assert.assertTrue;
 
 @Test(singleThreaded = true)
@@ -57,13 +70,14 @@ public class TestMemorySmoke
     protected QueryRunner createQueryRunner()
             throws Exception
     {
-        return MemoryQueryRunner.createQueryRunner(
+        return createMemoryQueryRunner(
                 // Adjust DF limits to test edge cases
                 ImmutableMap.of(
                         "dynamic-filtering.small-broadcast.max-distinct-values-per-driver", "100",
                         "dynamic-filtering.small-broadcast.range-row-limit-per-driver", "100",
                         "dynamic-filtering.large-broadcast.max-distinct-values-per-driver", "100",
-                        "dynamic-filtering.large-broadcast.range-row-limit-per-driver", "100000"));
+                        "dynamic-filtering.large-broadcast.range-row-limit-per-driver", "100000"),
+                ImmutableList.of(NATION, CUSTOMER, ORDERS, LINE_ITEM, PART));
     }
 
     @Test
@@ -97,6 +111,40 @@ public class TestMemorySmoke
         assertQueryResult("INSERT INTO test_select SELECT * FROM tpch.tiny.nation", 25L);
 
         assertQueryResult("SELECT count(*) FROM test_select", 75L);
+    }
+
+    @Test
+    public void testCustomMetricsScanFilter()
+    {
+        Map<String, Metric> metrics = collectCustomMetrics("SELECT partkey FROM part WHERE partkey % 1000 > 0");
+        assertThat(metrics.get("rows")).isEqualTo(new LongCount(PART_COUNT));
+        assertThat(metrics.get("started")).isEqualTo(metrics.get("finished"));
+        assertThat(((Count) metrics.get("finished")).getTotal()).isGreaterThan(0);
+    }
+
+    @Test
+    public void testCustomMetricsScanOnly()
+    {
+        Map<String, Metric> metrics = collectCustomMetrics("SELECT partkey FROM part");
+        assertThat(metrics.get("rows")).isEqualTo(new LongCount(PART_COUNT));
+        assertThat(metrics.get("started")).isEqualTo(metrics.get("finished"));
+        assertThat(((Count) metrics.get("finished")).getTotal()).isGreaterThan(0);
+    }
+
+    private Map<String, Metric> collectCustomMetrics(String sql)
+    {
+        DistributedQueryRunner runner = (DistributedQueryRunner) getQueryRunner();
+        ResultWithQueryId<MaterializedResult> result = runner.executeWithQueryId(getSession(), sql);
+        return runner
+                .getCoordinator()
+                .getQueryManager()
+                .getFullQueryInfo(result.getQueryId())
+                .getQueryStats()
+                .getOperatorSummaries()
+                .stream()
+                .map(OperatorStats::getMetrics)
+                .reduce(Metrics.EMPTY, Metrics::mergeWith)
+                .getMetrics();
     }
 
     @Test

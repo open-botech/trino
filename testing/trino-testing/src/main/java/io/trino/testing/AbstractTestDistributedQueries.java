@@ -111,6 +111,11 @@ public abstract class AbstractTestDistributedQueries
         return true;
     }
 
+    protected boolean supportsRenameTable()
+    {
+        return true;
+    }
+
     /**
      * Ensure the tests are run with {@link DistributedQueryRunner}. E.g. {@link LocalQueryRunner} takes some
      * shortcuts, not exercising certain aspects.
@@ -271,11 +276,15 @@ public abstract class AbstractTestDistributedQueries
     public void testRenameTable()
     {
         skipTestUnless(supportsCreateTable());
-
         String tableName = "test_rename_" + randomTableSuffix();
         assertUpdate("CREATE TABLE " + tableName + " AS SELECT 123 x", 1);
 
         String renamedTable = "test_rename_new_" + randomTableSuffix();
+        if (!supportsRenameTable()) {
+            assertQueryFails("ALTER TABLE " + tableName + " RENAME TO " + renamedTable, "This connector does not support renaming tables");
+            return;
+        }
+
         assertUpdate("ALTER TABLE " + tableName + " RENAME TO " + renamedTable);
         assertQuery("SELECT x FROM " + renamedTable, "VALUES 123");
 
@@ -307,6 +316,8 @@ public abstract class AbstractTestDistributedQueries
             return;
         }
 
+        String catalogName = getSession().getCatalog().orElseThrow();
+        String schemaName = getSession().getSchema().orElseThrow();
         String tableName = "test_comment_" + randomTableSuffix();
         assertUpdate("CREATE TABLE " + tableName + "(a integer)");
 
@@ -314,6 +325,12 @@ public abstract class AbstractTestDistributedQueries
         assertUpdate("COMMENT ON TABLE " + tableName + " IS 'new comment'");
         assertThat((String) computeActual("SHOW CREATE TABLE " + tableName).getOnlyValue()).contains("COMMENT 'new comment'");
         assertThat(getTableComment(tableName)).isEqualTo("new comment");
+        assertThat(query(
+                "SELECT table_name, comment FROM system.metadata.table_comments " +
+                        "WHERE catalog_name = '" + catalogName + "' AND " +
+                        "schema_name = '" + schemaName + "'"))
+                .skippingTypesCheck()
+                .containsAll("VALUES ('" + tableName + "', 'new comment')");
 
         // comment updated
         assertUpdate("COMMENT ON TABLE " + tableName + " IS 'updated comment'");
@@ -459,7 +476,7 @@ public abstract class AbstractTestDistributedQueries
         skipTestUnless(supportsCreateTable());
 
         String tableName = "test_add_column_" + randomTableSuffix();
-        assertUpdate("CREATE TABLE " + tableName + " AS SELECT CAST('first' AS varchar) x", 1);
+        assertUpdate("CREATE TABLE " + tableName + " AS SELECT VARCHAR 'first' x", 1);
 
         assertQueryFails("ALTER TABLE " + tableName + " ADD COLUMN x bigint", ".* Column 'x' already exists");
         assertQueryFails("ALTER TABLE " + tableName + " ADD COLUMN X bigint", ".* Column 'X' already exists");
@@ -599,19 +616,8 @@ public abstract class AbstractTestDistributedQueries
         }
 
         String tableName = "test_delete_" + randomTableSuffix();
-        assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM orders", "SELECT count(*) FROM orders");
-
-        // delete half the table, then delete the rest
-        assertUpdate("DELETE FROM " + tableName + " WHERE orderkey % 2 = 0", "SELECT count(*) FROM orders WHERE orderkey % 2 = 0");
-        assertQuery("SELECT * FROM " + tableName, "SELECT * FROM orders WHERE orderkey % 2 <> 0");
-
-        assertUpdate("DELETE FROM " + tableName, "SELECT count(*) FROM orders WHERE orderkey % 2 <> 0");
-        assertQuery("SELECT * FROM " + tableName, "SELECT * FROM orders LIMIT 0");
-
-        assertUpdate("DROP TABLE " + tableName);
 
         // delete successive parts of the table
-
         assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM orders", "SELECT count(*) FROM orders");
 
         assertUpdate("DELETE FROM " + tableName + " WHERE custkey <= 100", "SELECT count(*) FROM orders WHERE custkey <= 100");
@@ -625,30 +631,62 @@ public abstract class AbstractTestDistributedQueries
 
         assertUpdate("DROP TABLE " + tableName);
 
-        // delete using a constant property
-
-        assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM orders", "SELECT count(*) FROM orders");
-
-        assertUpdate("DELETE FROM " + tableName + " WHERE orderstatus = 'O'", "SELECT count(*) FROM orders WHERE orderstatus = 'O'");
-        assertQuery("SELECT * FROM " + tableName, "SELECT * FROM orders WHERE orderstatus <> 'O'");
-
-        assertUpdate("DROP TABLE " + tableName);
-
         // delete without matching any rows
-
         assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM orders", "SELECT count(*) FROM orders");
-        assertUpdate("DELETE FROM " + tableName + " WHERE rand() < 0", 0);
         assertUpdate("DELETE FROM " + tableName + " WHERE orderkey < 0", 0);
         assertUpdate("DROP TABLE " + tableName);
 
         // delete with a predicate that optimizes to false
-
         assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM orders", "SELECT count(*) FROM orders");
         assertUpdate("DELETE FROM " + tableName + " WHERE orderkey > 5 AND orderkey < 4", 0);
         assertUpdate("DROP TABLE " + tableName);
 
-        // delete using a subquery
+        // test EXPLAIN ANALYZE with CTAS
+        assertExplainAnalyze("EXPLAIN ANALYZE CREATE TABLE " + tableName + " AS SELECT CAST(orderstatus AS VARCHAR(15)) orderstatus FROM orders");
+        assertQuery("SELECT * from " + tableName, "SELECT orderstatus FROM orders");
+        // check that INSERT works also
+        assertExplainAnalyze("EXPLAIN ANALYZE INSERT INTO " + tableName + " SELECT clerk FROM orders");
+        assertQuery("SELECT * from " + tableName, "SELECT orderstatus FROM orders UNION ALL SELECT clerk FROM orders");
+        // check DELETE works with EXPLAIN ANALYZE
+        assertExplainAnalyze("EXPLAIN ANALYZE DELETE FROM " + tableName + " WHERE TRUE");
+        assertQuery("SELECT COUNT(*) from " + tableName, "SELECT 0");
+        assertUpdate("DROP TABLE " + tableName);
+    }
 
+    @Test
+    public void testDeleteWithComplexPredicate()
+    {
+        if (!supportsDelete()) {
+            assertQueryFails("DELETE FROM nation", "This connector does not support deletes");
+            return;
+        }
+
+        String tableName = "test_delete_" + randomTableSuffix();
+        assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM orders", "SELECT count(*) FROM orders");
+
+        // delete half the table, then delete the rest
+        assertUpdate("DELETE FROM " + tableName + " WHERE orderkey % 2 = 0", "SELECT count(*) FROM orders WHERE orderkey % 2 = 0");
+        assertQuery("SELECT * FROM " + tableName, "SELECT * FROM orders WHERE orderkey % 2 <> 0");
+
+        assertUpdate("DELETE FROM " + tableName, "SELECT count(*) FROM orders WHERE orderkey % 2 <> 0");
+        assertQuery("SELECT * FROM " + tableName, "SELECT * FROM orders LIMIT 0");
+
+        assertUpdate("DELETE FROM " + tableName + " WHERE rand() < 0", 0);
+
+        assertUpdate("DROP TABLE " + tableName);
+    }
+
+    @Test
+    public void testDeleteWithSubquery()
+    {
+        if (!supportsDelete()) {
+            assertQueryFails("DELETE FROM nation", "This connector does not support deletes");
+            return;
+        }
+
+        String tableName = "test_delete_" + randomTableSuffix();
+
+        // delete using a subquery
         assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM nation", 25);
 
         assertUpdate("DELETE FROM " + tableName + " WHERE regionkey IN (SELECT regionkey FROM region WHERE name LIKE 'A%')", 15);
@@ -658,8 +696,26 @@ public abstract class AbstractTestDistributedQueries
 
         assertUpdate("DROP TABLE " + tableName);
 
-        // delete with multiple SemiJoin
+        // delete using a scalar and EXISTS subquery
+        assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM orders", "SELECT count(*) FROM orders");
+        assertUpdate("DELETE FROM " + tableName + " WHERE orderkey = (SELECT orderkey FROM orders ORDER BY orderkey LIMIT 1)", 1);
+        assertUpdate("DELETE FROM " + tableName + " WHERE orderkey = (SELECT orderkey FROM orders WHERE false)", 0);
+        assertUpdate("DELETE FROM " + tableName + " WHERE EXISTS(SELECT 1 WHERE false)", 0);
+        assertUpdate("DELETE FROM " + tableName + " WHERE EXISTS(SELECT 1)", "SELECT count(*) - 1 FROM orders");
+        assertUpdate("DROP TABLE " + tableName);
+    }
 
+    @Test
+    public void testDeleteWithSemiJoin()
+    {
+        if (!supportsDelete()) {
+            assertQueryFails("DELETE FROM nation", "This connector does not support deletes");
+            return;
+        }
+
+        String tableName = "test_delete_" + randomTableSuffix();
+
+        // delete with multiple SemiJoin
         assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM nation", 25);
 
         assertUpdate(
@@ -676,7 +732,6 @@ public abstract class AbstractTestDistributedQueries
         assertUpdate("DROP TABLE " + tableName);
 
         // delete with SemiJoin null handling
-
         assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM orders", "SELECT count(*) FROM orders");
 
         assertUpdate(
@@ -690,24 +745,22 @@ public abstract class AbstractTestDistributedQueries
                         "WHERE (orderkey IN (SELECT CASE WHEN orderkey % 3 = 0 THEN NULL ELSE orderkey END FROM lineitem)) IS NOT NULL\n");
 
         assertUpdate("DROP TABLE " + tableName);
+    }
 
-        // delete using a scalar and EXISTS subquery
+    @Test
+    public void testDeleteWithVarcharPredicate()
+    {
+        if (!supportsDelete()) {
+            assertQueryFails("DELETE FROM nation", "This connector does not support deletes");
+            return;
+        }
+
+        String tableName = "test_delete_" + randomTableSuffix();
         assertUpdate("CREATE TABLE " + tableName + " AS SELECT * FROM orders", "SELECT count(*) FROM orders");
-        assertUpdate("DELETE FROM " + tableName + " WHERE orderkey = (SELECT orderkey FROM orders ORDER BY orderkey LIMIT 1)", 1);
-        assertUpdate("DELETE FROM " + tableName + " WHERE orderkey = (SELECT orderkey FROM orders WHERE false)", 0);
-        assertUpdate("DELETE FROM " + tableName + " WHERE EXISTS(SELECT 1 WHERE false)", 0);
-        assertUpdate("DELETE FROM " + tableName + " WHERE EXISTS(SELECT 1)", "SELECT count(*) - 1 FROM orders");
-        assertUpdate("DROP TABLE " + tableName);
 
-        // test EXPLAIN ANALYZE with CTAS
-        assertExplainAnalyze("EXPLAIN ANALYZE CREATE TABLE " + tableName + " AS SELECT CAST(orderstatus AS VARCHAR(15)) orderstatus FROM orders");
-        assertQuery("SELECT * from " + tableName, "SELECT orderstatus FROM orders");
-        // check that INSERT works also
-        assertExplainAnalyze("EXPLAIN ANALYZE INSERT INTO " + tableName + " SELECT clerk FROM orders");
-        assertQuery("SELECT * from " + tableName, "SELECT orderstatus FROM orders UNION ALL SELECT clerk FROM orders");
-        // check DELETE works with EXPLAIN ANALYZE
-        assertExplainAnalyze("EXPLAIN ANALYZE DELETE FROM " + tableName + " WHERE TRUE");
-        assertQuery("SELECT COUNT(*) from " + tableName, "SELECT 0");
+        assertUpdate("DELETE FROM " + tableName + " WHERE orderstatus = 'O'", "SELECT count(*) FROM orders WHERE orderstatus = 'O'");
+        assertQuery("SELECT * FROM " + tableName, "SELECT * FROM orders WHERE orderstatus <> 'O'");
+
         assertUpdate("DROP TABLE " + tableName);
     }
 
@@ -722,10 +775,15 @@ public abstract class AbstractTestDistributedQueries
     @Test
     public void testView()
     {
-        skipTestUnless(supportsViews());
+        if (!supportsViews()) {
+            assertQueryFails("CREATE VIEW nation_v AS SELECT * FROM nation", "This connector does not support creating views");
+            return;
+        }
 
         @Language("SQL") String query = "SELECT orderkey, orderstatus, totalprice / 2 half FROM orders";
 
+        String catalogName = getSession().getCatalog().orElseThrow();
+        String schemaName = getSession().getSchema().orElseThrow();
         String testView = "test_view_" + randomTableSuffix();
         String testViewWithComment = "test_view_with_comment_" + randomTableSuffix();
         assertUpdate("CREATE VIEW " + testView + " AS SELECT 123 x");
@@ -736,6 +794,12 @@ public abstract class AbstractTestDistributedQueries
 
         MaterializedResult materializedRows = computeActual("SHOW CREATE VIEW " + testViewWithComment);
         assertThat((String) materializedRows.getOnlyValue()).contains("COMMENT 'orders'");
+        assertThat(query(
+                "SELECT table_name, comment FROM system.metadata.table_comments " +
+                        "WHERE catalog_name = '" + catalogName + "' AND " +
+                        "schema_name = '" + schemaName + "'"))
+                .skippingTypesCheck()
+                .containsAll("VALUES ('" + testView + "', null), ('" + testViewWithComment + "', 'orders')");
 
         assertQuery("SELECT * FROM " + testView, query);
         assertQuery("SELECT * FROM " + testViewWithComment, query);
@@ -746,7 +810,7 @@ public abstract class AbstractTestDistributedQueries
 
         assertQuery("WITH orders AS (SELECT * FROM orders LIMIT 0) SELECT * FROM " + testView, query);
 
-        String name = format("%s.%s." + testView, getSession().getCatalog().get(), getSession().getSchema().get());
+        String name = format("%s.%s." + testView, catalogName, schemaName);
         assertQuery("SELECT * FROM " + name, query);
 
         assertUpdate("DROP VIEW " + testView);

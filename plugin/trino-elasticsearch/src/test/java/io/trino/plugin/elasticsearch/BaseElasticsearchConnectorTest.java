@@ -28,6 +28,7 @@ import io.trino.tpch.TpchTable;
 import org.apache.http.HttpHost;
 import org.apache.http.entity.ContentType;
 import org.apache.http.nio.entity.NStringEntity;
+import org.elasticsearch.client.Request;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.intellij.lang.annotations.Language;
@@ -1195,20 +1196,27 @@ public abstract class BaseElasticsearchConnectorTest
 
     protected abstract String indexEndpoint(String index, String docId);
 
-    private void index(String index, Map<String, Object> document)
+    void index(String index, Map<String, Object> document)
             throws IOException
     {
         String json = new ObjectMapper().writeValueAsString(document);
         String endpoint = format("%s?refresh", indexEndpoint(index, String.valueOf(System.nanoTime())));
+        Request request = new Request(
+                "PUT",
+                endpoint);
+        request.setEntity(new NStringEntity(json, ContentType.APPLICATION_JSON));
         client.getLowLevelClient()
-                .performRequest("PUT", endpoint, ImmutableMap.of(), new NStringEntity(json, ContentType.APPLICATION_JSON));
+                .performRequest(request);
     }
 
     private void addAlias(String index, String alias)
             throws IOException
     {
+        Request request = new Request(
+                "PUT",
+                format("/%s/_alias/%s", index, alias));
         client.getLowLevelClient()
-                .performRequest("PUT", format("/%s/_alias/%s", index, alias));
+                .performRequest(request);
 
         refreshIndex(alias);
     }
@@ -1218,21 +1226,31 @@ public abstract class BaseElasticsearchConnectorTest
     private void createIndex(String indexName)
             throws IOException
     {
-        client.getLowLevelClient().performRequest("PUT", "/" + indexName);
+        Request request = new Request(
+                "PUT",
+                "/" + indexName);
+        client.getLowLevelClient().performRequest(request);
     }
 
-    private void createIndex(String indexName, @Language("JSON") String properties)
+    void createIndex(String indexName, @Language("JSON") String properties)
             throws IOException
     {
         String mappings = indexMapping(properties);
+        Request request = new Request(
+                "PUT",
+                "/" + indexName);
+        request.setEntity(new NStringEntity(mappings, ContentType.APPLICATION_JSON));
         client.getLowLevelClient()
-                .performRequest("PUT", "/" + indexName, ImmutableMap.of(), new NStringEntity(mappings, ContentType.APPLICATION_JSON));
+                .performRequest(request);
     }
 
     private void refreshIndex(String index)
             throws IOException
     {
+        Request request = new Request(
+                "GET",
+                format("/%s/_refresh", index));
         client.getLowLevelClient()
-                .performRequest("GET", format("/%s/_refresh", index));
+                .performRequest(request);
     }
 }

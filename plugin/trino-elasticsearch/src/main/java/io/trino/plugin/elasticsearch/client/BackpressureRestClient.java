@@ -26,12 +26,11 @@ import net.jodah.failsafe.function.CheckedSupplier;
 import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpHost;
-import org.elasticsearch.client.Response;
-import org.elasticsearch.client.ResponseException;
-import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.*;
 import org.elasticsearch.rest.RestStatus;
 
 import java.io.IOException;
+import java.util.Collection;
 import java.util.Map;
 
 import static com.google.common.base.Throwables.throwIfInstanceOf;
@@ -65,22 +64,14 @@ public class BackpressureRestClient
                 .onFailure(this::onComplete);
     }
 
-    public void setHosts(HttpHost... hosts)
-    {
-        delegate.setHosts(hosts);
-    }
 
-    public Response performRequest(String method, String endpoint, Header... headers)
+
+    public Response performRequest(Request request)
             throws IOException
     {
-        return executeWithRetries(() -> delegate.performRequest(method, endpoint, headers));
+        return executeWithRetries(() -> delegate.performRequest(request));
     }
 
-    public Response performRequest(String method, String endpoint, Map<String, String> params, HttpEntity entity, Header... headers)
-            throws IOException
-    {
-        return executeWithRetries(() -> delegate.performRequest(method, endpoint, params, entity, headers));
-    }
 
     public void close()
             throws IOException

@@ -494,7 +494,7 @@ public class PinotClient
                 if (firstError == null) {
                     firstError = e;
                 }
-                if (!e.isRetryable()) {
+                if (!e.isRetriable()) {
                     throw e;
                 }
             }

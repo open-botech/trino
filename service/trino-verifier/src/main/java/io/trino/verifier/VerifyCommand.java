@@ -40,7 +40,6 @@ import io.trino.sql.tree.DropMaterializedView;
 import io.trino.sql.tree.DropTable;
 import io.trino.sql.tree.DropView;
 import io.trino.sql.tree.Explain;
-import io.trino.sql.tree.ExplainAnalyze;
 import io.trino.sql.tree.Insert;
 import io.trino.sql.tree.RefreshMaterializedView;
 import io.trino.sql.tree.RenameColumn;
@@ -129,7 +128,7 @@ public class VerifyCommand
         Bootstrap app = new Bootstrap(builder.build());
         Injector injector;
         try {
-            injector = app.initialize();
+            injector = app.strictConfig().initialize();
         }
         catch (Exception e) {
             throwIfUnchecked(e);
@@ -398,10 +397,10 @@ public class VerifyCommand
             return MODIFY;
         }
         if (statement instanceof Explain) {
+            if (((Explain) statement).isAnalyze()) {
+                return statementToQueryType(((Explain) statement).getStatement());
+            }
             return READ;
-        }
-        if (statement instanceof ExplainAnalyze) {
-            return statementToQueryType(((ExplainAnalyze) statement).getStatement());
         }
         if (statement instanceof Insert) {
             return MODIFY;

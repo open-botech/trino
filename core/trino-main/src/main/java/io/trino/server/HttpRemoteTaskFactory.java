@@ -37,7 +37,6 @@ import io.trino.operator.ForScheduler;
 import io.trino.server.remotetask.HttpRemoteTask;
 import io.trino.server.remotetask.RemoteTaskStats;
 import io.trino.sql.planner.PlanFragment;
-import io.trino.sql.planner.plan.DynamicFilterId;
 import io.trino.sql.planner.plan.PlanNodeId;
 import org.weakref.jmx.Managed;
 import org.weakref.jmx.Nested;
@@ -46,7 +45,6 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 
 import java.util.OptionalInt;
-import java.util.Set;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
@@ -134,7 +132,6 @@ public class HttpRemoteTaskFactory
             OptionalInt totalPartitions,
             OutputBuffers outputBuffers,
             PartitionedSplitCountTracker partitionedSplitCountTracker,
-            Set<DynamicFilterId> outboundDynamicFilterIds,
             boolean summarizeTaskInfo)
     {
         return new HttpRemoteTask(session,
@@ -159,7 +156,6 @@ public class HttpRemoteTaskFactory
                 taskUpdateRequestCodec,
                 partitionedSplitCountTracker,
                 stats,
-                dynamicFilterService,
-                outboundDynamicFilterIds);
+                dynamicFilterService);
     }
 }

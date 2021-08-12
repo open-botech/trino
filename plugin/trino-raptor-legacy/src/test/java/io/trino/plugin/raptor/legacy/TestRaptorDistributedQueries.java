@@ -34,12 +34,6 @@ public class TestRaptorDistributedQueries
     }
 
     @Override
-    protected boolean supportsCreateSchema()
-    {
-        return false;
-    }
-
-    @Override
     protected boolean supportsCommentOnTable()
     {
         return false;
@@ -55,6 +49,12 @@ public class TestRaptorDistributedQueries
     protected TestTable createTableWithDefaultColumns()
     {
         throw new SkipException("Raptor connector does not support column default values");
+    }
+
+    @Override
+    public void testCreateSchema()
+    {
+        // schema creation is not supported
     }
 
     @Override

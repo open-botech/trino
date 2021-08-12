@@ -69,6 +69,7 @@ public class KafkaConnectorFactory
                 });
 
         Injector injector = app
+                .strictConfig()
                 .doNotInitializeLogging()
                 .setRequiredConfigurationProperties(config)
                 .initialize();

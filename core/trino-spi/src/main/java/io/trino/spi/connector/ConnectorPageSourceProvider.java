@@ -21,11 +21,14 @@ public interface ConnectorPageSourceProvider
      * @param columns columns that should show up in the output page, in this order
      * @param dynamicFilter optionally remove rows that don't satisfy this predicate
      */
-    ConnectorPageSource createPageSource(
+    default ConnectorPageSource createPageSource(
             ConnectorTransactionHandle transaction,
             ConnectorSession session,
             ConnectorSplit split,
             ConnectorTableHandle table,
             List<ColumnHandle> columns,
-            DynamicFilter dynamicFilter);
+            DynamicFilter dynamicFilter)
+    {
+        throw new UnsupportedOperationException("createPageSource() must be implemented");
+    }
 }

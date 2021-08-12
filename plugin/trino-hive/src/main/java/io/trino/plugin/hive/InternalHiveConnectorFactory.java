@@ -34,7 +34,7 @@ import io.trino.plugin.base.classloader.ClassLoaderSafeNodePartitioningProvider;
 import io.trino.plugin.base.jmx.ConnectorObjectNameGeneratorModule;
 import io.trino.plugin.base.jmx.MBeanServerModule;
 import io.trino.plugin.base.session.SessionPropertiesProvider;
-import io.trino.plugin.hive.authentication.HdfsAuthenticationModule;
+import io.trino.plugin.hive.authentication.HiveAuthenticationModule;
 import io.trino.plugin.hive.azure.HiveAzureModule;
 import io.trino.plugin.hive.gcs.HiveGcsModule;
 import io.trino.plugin.hive.metastore.HiveMetastore;
@@ -100,7 +100,7 @@ public final class InternalHiveConnectorFactory
                     conditionalModule(RubixEnabledConfig.class, RubixEnabledConfig::isCacheEnabled, new RubixModule()),
                     new HiveMetastoreModule(metastore),
                     new HiveSecurityModule(catalogName),
-                    new HdfsAuthenticationModule(),
+                    new HiveAuthenticationModule(),
                     new HiveProcedureModule(),
                     new MBeanServerModule(),
                     binder -> {
@@ -116,6 +116,7 @@ public final class InternalHiveConnectorFactory
                     module);
 
             Injector injector = app
+                    .strictConfig()
                     .doNotInitializeLogging()
                     .setRequiredConfigurationProperties(config)
                     .initialize();
@@ -131,7 +132,9 @@ public final class InternalHiveConnectorFactory
             HiveTableProperties hiveTableProperties = injector.getInstance(HiveTableProperties.class);
             HiveAnalyzeProperties hiveAnalyzeProperties = injector.getInstance(HiveAnalyzeProperties.class);
             HiveMaterializedViewPropertiesProvider hiveMaterializedViewPropertiesProvider = injector.getInstance(HiveMaterializedViewPropertiesProvider.class);
-            ConnectorAccessControl accessControl = new ClassLoaderSafeConnectorAccessControl(injector.getInstance(SystemTableAwareAccessControl.class), classLoader);
+            ConnectorAccessControl accessControl = new ClassLoaderSafeConnectorAccessControl(
+                    new SystemTableAwareAccessControl(injector.getInstance(ConnectorAccessControl.class)),
+                    classLoader);
             Set<Procedure> procedures = injector.getInstance(Key.get(new TypeLiteral<Set<Procedure>>() {}));
             Set<SystemTable> systemTables = injector.getInstance(Key.get(new TypeLiteral<Set<SystemTable>>() {}));
             Set<EventListener> eventListeners = injector.getInstance(Key.get(new TypeLiteral<Set<EventListener>>() {}))

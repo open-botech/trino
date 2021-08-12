@@ -80,6 +80,7 @@ public class AtopConnectorFactory
                             }));
 
             Injector injector = app
+                    .strictConfig()
                     .doNotInitializeLogging()
                     .setRequiredConfigurationProperties(requiredConfig)
                     .initialize();

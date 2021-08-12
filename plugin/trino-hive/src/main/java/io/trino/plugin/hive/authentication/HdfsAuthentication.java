@@ -13,16 +13,14 @@
  */
 package io.trino.plugin.hive.authentication;
 
-import io.trino.spi.security.ConnectorIdentity;
-
 public interface HdfsAuthentication
 {
-    <R, E extends Exception> R doAs(ConnectorIdentity identity, GenericExceptionAction<R, E> action)
+    <R, E extends Exception> R doAs(String user, GenericExceptionAction<R, E> action)
             throws E;
 
-    default void doAs(ConnectorIdentity identity, Runnable action)
+    default void doAs(String user, Runnable action)
     {
-        doAs(identity, () -> {
+        doAs(user, () -> {
             action.run();
             return null;
         });

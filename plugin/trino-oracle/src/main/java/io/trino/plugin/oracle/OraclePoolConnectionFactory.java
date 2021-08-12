@@ -80,10 +80,6 @@ public class OraclePoolConnectionFactory
     public Connection openConnection(ConnectorSession session)
             throws SQLException
     {
-        Connection connection = dataSource.getConnection();
-        // Oracle's pool doesn't reset autocommit state of connections when reusing them so we explicitly enable
-        // autocommit by default to match the JDBC specification.
-        connection.setAutoCommit(true);
-        return connection;
+        return dataSource.getConnection();
     }
 }

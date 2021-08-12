@@ -66,6 +66,7 @@ public class PhoenixConnectorFactory
                     });
 
             Injector injector = app
+                    .strictConfig()
                     .doNotInitializeLogging()
                     .setRequiredConfigurationProperties(requiredConfig)
                     .initialize();

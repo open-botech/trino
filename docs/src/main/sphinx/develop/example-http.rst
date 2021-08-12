@@ -68,6 +68,7 @@ and exception handling:
             new ExampleModule(catalogName));
 
     Injector injector = app
+            .strictConfig()
             .doNotInitializeLogging()
             .setRequiredConfigurationProperties(requiredConfig)
             .initialize();

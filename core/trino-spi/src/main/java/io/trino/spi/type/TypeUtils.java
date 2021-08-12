@@ -73,10 +73,10 @@ public final class TypeUtils
             type.writeBoolean(blockBuilder, (Boolean) value);
         }
         else if (type.getJavaType() == double.class) {
-            type.writeDouble(blockBuilder, ((double) value));
+            type.writeDouble(blockBuilder, ((Number) value).doubleValue());
         }
         else if (type.getJavaType() == long.class) {
-            type.writeLong(blockBuilder, ((long) value));
+            type.writeLong(blockBuilder, ((Number) value).longValue());
         }
         else if (type.getJavaType() == Slice.class) {
             Slice slice;

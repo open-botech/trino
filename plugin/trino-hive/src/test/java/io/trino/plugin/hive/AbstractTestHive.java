@@ -829,9 +829,6 @@ public abstract class AbstractTestHive
                             ImmutableMap.of(),
                             TupleDomain.all()));
                 },
-                ImmutableSet.of(
-                        new PartitionsSystemTableProvider(partitionManager),
-                        new PropertiesSystemTableProvider()),
                 (metastore) -> new NoneHiveMaterializedViewMetadata()
                 {
                     @Override

@@ -152,8 +152,7 @@ public abstract class AbstractFileFormat
                 Optional.empty(),
                 Optional.empty(),
                 false,
-                Optional.empty(),
-                0);
+                Optional.empty());
 
         return factory.createPageSource(
                 TestingConnectorTransactionHandle.INSTANCE,

@@ -34,6 +34,7 @@ final class Commands
                         .build());
 
         Injector injector = app
+                .strictConfig()
                 .initialize();
 
         try {

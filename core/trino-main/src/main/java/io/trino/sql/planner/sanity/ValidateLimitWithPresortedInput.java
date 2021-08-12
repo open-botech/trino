@@ -17,7 +17,6 @@ import com.google.common.base.VerifyException;
 import io.trino.Session;
 import io.trino.execution.warnings.WarningCollector;
 import io.trino.metadata.Metadata;
-import io.trino.spi.connector.ConstantProperty;
 import io.trino.spi.connector.SortingProperty;
 import io.trino.spi.type.TypeOperators;
 import io.trino.sql.planner.Symbol;
@@ -98,7 +97,7 @@ public class ValidateLimitWithPresortedInput
             // We do not use LocalProperties#match to fully verify sorting properties
             // as OrderingScheme of input is not tracked by LimitNode
             List<Symbol> sortedColumns = normalizeAndPrune(properties.getLocalProperties()).stream()
-                    .filter(property -> property instanceof SortingProperty || property instanceof ConstantProperty)
+                    .filter(property -> property instanceof SortingProperty)
                     .flatMap(property -> property.getColumns().stream())
                     .collect(toImmutableList());
 

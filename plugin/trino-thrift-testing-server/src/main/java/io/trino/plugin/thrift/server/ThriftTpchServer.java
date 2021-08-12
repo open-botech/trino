@@ -35,7 +35,7 @@ public final class ThriftTpchServer
                         .add(new ThriftTpchServerModule())
                         .addAll(requireNonNull(extraModules, "extraModules is null"))
                         .build());
-        app.initialize();
+        app.strictConfig().initialize();
     }
 
     public static void main(String[] args)

@@ -17,7 +17,6 @@ import io.trino.plugin.jdbc.credential.CredentialPropertiesProvider;
 import io.trino.plugin.jdbc.credential.CredentialProvider;
 import io.trino.plugin.jdbc.credential.DefaultCredentialPropertiesProvider;
 import io.trino.spi.connector.ConnectorSession;
-import io.trino.spi.security.ConnectorIdentity;
 
 import java.sql.Connection;
 import java.sql.Driver;
@@ -61,13 +60,14 @@ public class DriverConnectionFactory
     public Connection openConnection(ConnectorSession session)
             throws SQLException
     {
-        Properties properties = getCredentialProperties(session.getIdentity());
+        JdbcIdentity identity = JdbcIdentity.from(session);
+        Properties properties = getCredentialProperties(identity);
         Connection connection = driver.connect(connectionUrl, properties);
         checkState(connection != null, "Driver returned null connection, make sure the connection URL '%s' is valid for the driver %s", connectionUrl, driver);
         return connection;
     }
 
-    private Properties getCredentialProperties(ConnectorIdentity identity)
+    private Properties getCredentialProperties(JdbcIdentity identity)
     {
         Properties properties = new Properties();
         properties.putAll(connectionProperties);

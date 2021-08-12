@@ -46,7 +46,6 @@ public class TestTaskStats
             10,
 
             11.0,
-            5.0,
             DataSize.ofBytes(12),
             DataSize.ofBytes(13),
             DataSize.ofBytes(14),
@@ -109,7 +108,6 @@ public class TestTaskStats
         assertEquals(actual.getCompletedDrivers(), 10);
 
         assertEquals(actual.getCumulativeUserMemory(), 11.0);
-        assertEquals(actual.getCumulativeSystemMemory(), 5.0);
         assertEquals(actual.getUserMemoryReservation(), DataSize.ofBytes(12));
         assertEquals(actual.getRevocableMemoryReservation(), DataSize.ofBytes(13));
         assertEquals(actual.getSystemMemoryReservation(), DataSize.ofBytes(14));

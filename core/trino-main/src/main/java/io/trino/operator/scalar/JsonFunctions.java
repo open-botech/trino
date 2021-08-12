@@ -14,7 +14,6 @@
 package io.trino.operator.scalar;
 
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonFactoryBuilder;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.MappingJsonFactory;
@@ -54,9 +53,8 @@ import static io.trino.util.JsonUtil.truncateIfNecessaryForErrorMessage;
 
 public final class JsonFunctions
 {
-    private static final JsonFactory JSON_FACTORY = new JsonFactoryBuilder()
-            .disable(CANONICALIZE_FIELD_NAMES)
-            .build();
+    private static final JsonFactory JSON_FACTORY = new JsonFactory()
+            .disable(CANONICALIZE_FIELD_NAMES);
 
     private static final JsonFactory MAPPING_JSON_FACTORY = new MappingJsonFactory()
             .disable(CANONICALIZE_FIELD_NAMES);

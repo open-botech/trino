@@ -16,7 +16,7 @@ package io.trino.plugin.iceberg;
 import static org.apache.iceberg.FileFormat.ORC;
 
 public class TestIcebergOrcConnectorTest
-        extends BaseIcebergConnectorTest
+        extends AbstractTestIcebergConnectorTest
 {
     public TestIcebergOrcConnectorTest()
     {

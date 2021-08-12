@@ -170,12 +170,12 @@ public final class Domain
         return value == null ? nullAllowed : values.containsValue(value);
     }
 
-    public boolean isNullableDiscreteSet()
+    boolean isNullableDiscreteSet()
     {
         return values.isNone() ? nullAllowed : values.isDiscreteSet();
     }
 
-    public DiscreteSet getNullableDiscreteSet()
+    DiscreteSet getNullableDiscreteSet()
     {
         if (!isNullableDiscreteSet()) {
             throw new IllegalStateException("Domain is not a nullable discrete set");
@@ -330,7 +330,7 @@ public final class Domain
         return "[ " + (nullAllowed ? "NULL, " : "") + values.toString(session, limit) + " ]";
     }
 
-    public static class DiscreteSet
+    static class DiscreteSet
     {
         private final List<Object> nonNullValues;
         private final boolean containsNull;
@@ -344,12 +344,12 @@ public final class Domain
             }
         }
 
-        public List<Object> getNonNullValues()
+        List<Object> getNonNullValues()
         {
             return nonNullValues;
         }
 
-        public boolean containsNull()
+        boolean containsNull()
         {
             return containsNull;
         }

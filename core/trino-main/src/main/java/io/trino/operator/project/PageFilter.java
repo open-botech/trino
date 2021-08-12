@@ -29,9 +29,9 @@ public interface PageFilter
         int selectedCount = 0;
         for (int i = 0; i < size; i++) {
             boolean selectedPosition = selectedPositions[i];
-            // Avoid branching by casting boolean to integer.
-            // This improves CPU utilization by avoiding branch mispredictions.
-            selectedCount += selectedPosition ? 1 : 0;
+            if (selectedPosition) {
+                selectedCount++;
+            }
         }
 
         if (selectedCount == 0 || selectedCount == size) {
@@ -40,11 +40,11 @@ public interface PageFilter
 
         int[] positions = new int[selectedCount];
         int index = 0;
-        for (int position = 0; index < selectedCount; position++) {
-            // Improve CPU utilization by avoiding setting of position conditionally.
-            // This improves CPU utilization by avoiding branch mispredictions.
-            positions[index] = position;
-            index += selectedPositions[position] ? 1 : 0;
+        for (int position = 0; position < size; position++) {
+            if (selectedPositions[position]) {
+                positions[index] = position;
+                index++;
+            }
         }
         return SelectedPositions.positionsList(positions, 0, selectedCount);
     }

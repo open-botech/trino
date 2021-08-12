@@ -254,12 +254,6 @@ public class LazyBlock
     }
 
     @Override
-    public boolean mayHaveNull()
-    {
-        return getBlock().mayHaveNull();
-    }
-
-    @Override
     public final List<Block> getChildren()
     {
         return singletonList(getBlock());

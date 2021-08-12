@@ -20,7 +20,7 @@ import com.google.inject.Module;
 import com.google.inject.Scopes;
 import com.qubole.rubix.prestosql.CachingPrestoDistributedFileSystem;
 import io.trino.plugin.hive.DynamicConfigurationProvider;
-import io.trino.plugin.hive.authentication.HdfsAuthenticationConfig;
+import io.trino.plugin.hive.authentication.HiveAuthenticationConfig;
 import org.apache.hadoop.conf.Configuration;
 
 import java.util.Set;
@@ -40,7 +40,7 @@ public class RubixModule
     public void configure(Binder binder)
     {
         configBinder(binder).bindConfig(RubixConfig.class);
-        configBinder(binder).bindConfig(HdfsAuthenticationConfig.class);
+        configBinder(binder).bindConfig(HiveAuthenticationConfig.class);
         binder.bind(RubixConfigurationInitializer.class).in(Scopes.SINGLETON);
         binder.bind(RubixInitializer.class).in(Scopes.SINGLETON);
         // Make initialization of Rubix happen just once.
@@ -68,10 +68,10 @@ public class RubixModule
     static class DefaultRubixHdfsInitializer
             implements RubixHdfsInitializer
     {
-        private HdfsAuthenticationConfig authenticationConfig;
+        private HiveAuthenticationConfig authenticationConfig;
 
         @Inject
-        public DefaultRubixHdfsInitializer(HdfsAuthenticationConfig authenticationConfig)
+        public DefaultRubixHdfsInitializer(HiveAuthenticationConfig authenticationConfig)
         {
             this.authenticationConfig = requireNonNull(authenticationConfig, "authenticationConfig is null");
         }

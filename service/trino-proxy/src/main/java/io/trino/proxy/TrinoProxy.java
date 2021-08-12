@@ -49,7 +49,7 @@ public final class TrinoProxy
 
         Logger log = Logger.get(TrinoProxy.class);
         try {
-            app.initialize();
+            app.strictConfig().initialize();
             log.info("======== SERVER STARTED ========");
         }
         catch (Throwable t) {

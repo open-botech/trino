@@ -130,19 +130,13 @@ The connector supports pushdown for a number of operations:
 * :func:`min`
 * :func:`sum`
 
-.. _clickhouse-sql-support:
-
-SQL support
+Limitations
 -----------
 
-The connector provides read and write access to data and metadata in
-a ClickHouse catalog. In addition to the :ref:`globally available
-<sql-globally-available>` and :ref:`read operation <sql-read-operations>`
-statements, the connector supports the following features:
+The following SQL statements aren't  supported:
 
-* :doc:`/sql/insert`
-* :doc:`/sql/create-table`
-* :doc:`/sql/create-table-as`
-* :doc:`/sql/drop-table`
-* :doc:`/sql/create-schema`
-* :doc:`/sql/drop-schema`
+* :doc:`/sql/grant`
+* :doc:`/sql/revoke`
+* :doc:`/sql/show-grants`
+* :doc:`/sql/show-roles`
+* :doc:`/sql/show-role-grants`

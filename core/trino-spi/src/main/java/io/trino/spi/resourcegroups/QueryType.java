@@ -15,12 +15,12 @@ package io.trino.spi.resourcegroups;
 
 public enum QueryType
 {
-    SELECT,
-    EXPLAIN,
+    DATA_DEFINITION,
+    DELETE,
     DESCRIBE,
+    EXPLAIN,
+    ANALYZE,
     INSERT,
     UPDATE,
-    DELETE,
-    ANALYZE,
-    DATA_DEFINITION,
+    SELECT
 }

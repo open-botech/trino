@@ -100,7 +100,7 @@ public class ParquetWriter
 
     public long getWrittenBytes()
     {
-        return outputStream.longSize();
+        return outputStream.size();
     }
 
     public long getBufferedBytes()

@@ -112,8 +112,7 @@ public class TestHivePlugin
                 ImmutableMap.of(
                         "hive.metastore", "glue",
                         "hive.metastore.glue.region", "us-east-2"),
-                new TestingConnectorContext())
-                .shutdown();
+                new TestingConnectorContext());
 
         assertThatThrownBy(() -> factory.create(
                 "test",

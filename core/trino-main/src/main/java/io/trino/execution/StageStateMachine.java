@@ -269,7 +269,6 @@ public class StageStateMachine
         int completedDrivers = 0;
 
         long cumulativeUserMemory = 0;
-        long cumulativeSystemMemory = 0;
         long userMemoryReservation = 0;
         long totalMemoryReservation = 0;
 
@@ -299,7 +298,6 @@ public class StageStateMachine
             completedDrivers += taskStats.getCompletedDrivers();
 
             cumulativeUserMemory += taskStats.getCumulativeUserMemory();
-            cumulativeSystemMemory += taskStats.getCumulativeSystemMemory();
 
             long taskUserMemory = taskStats.getUserMemoryReservation().toBytes();
             long taskSystemMemory = taskStats.getSystemMemoryReservation().toBytes();
@@ -351,7 +349,6 @@ public class StageStateMachine
                 rawInputPositions,
 
                 cumulativeUserMemory,
-                cumulativeSystemMemory,
                 succinctBytes(userMemoryReservation),
                 succinctBytes(totalMemoryReservation),
 
@@ -390,7 +387,6 @@ public class StageStateMachine
         int completedDrivers = 0;
 
         long cumulativeUserMemory = 0;
-        long cumulativeSystemMemory = 0;
         long userMemoryReservation = 0;
         long revocableMemoryReservation = 0;
         long totalMemoryReservation = 0;
@@ -448,7 +444,6 @@ public class StageStateMachine
             completedDrivers += taskStats.getCompletedDrivers();
 
             cumulativeUserMemory += taskStats.getCumulativeUserMemory();
-            cumulativeSystemMemory += taskStats.getCumulativeSystemMemory();
 
             long taskUserMemory = taskStats.getUserMemoryReservation().toBytes();
             long taskSystemMemory = taskStats.getSystemMemoryReservation().toBytes();
@@ -515,7 +510,6 @@ public class StageStateMachine
                 completedDrivers,
 
                 cumulativeUserMemory,
-                cumulativeSystemMemory,
                 succinctBytes(userMemoryReservation),
                 succinctBytes(revocableMemoryReservation),
                 succinctBytes(totalMemoryReservation),

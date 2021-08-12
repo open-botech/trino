@@ -78,6 +78,7 @@ public class JdbcConnectorFactory
                 moduleProvider.getModule(catalogName));
 
         Injector injector = app
+                .strictConfig()
                 .doNotInitializeLogging()
                 .setRequiredConfigurationProperties(requiredConfig)
                 .initialize();

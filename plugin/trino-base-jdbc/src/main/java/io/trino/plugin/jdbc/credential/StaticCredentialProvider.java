@@ -13,7 +13,7 @@
  */
 package io.trino.plugin.jdbc.credential;
 
-import io.trino.spi.security.ConnectorIdentity;
+import io.trino.plugin.jdbc.JdbcIdentity;
 
 import java.util.Optional;
 
@@ -37,13 +37,13 @@ public class StaticCredentialProvider
     }
 
     @Override
-    public Optional<String> getConnectionUser(Optional<ConnectorIdentity> jdbcIdentity)
+    public Optional<String> getConnectionUser(Optional<JdbcIdentity> jdbcIdentity)
     {
         return connectionUser;
     }
 
     @Override
-    public Optional<String> getConnectionPassword(Optional<ConnectorIdentity> jdbcIdentity)
+    public Optional<String> getConnectionPassword(Optional<JdbcIdentity> jdbcIdentity)
     {
         return connectionPassword;
     }

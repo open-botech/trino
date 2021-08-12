@@ -59,6 +59,7 @@ public class JmxConnectorFactory
                 });
 
         Injector injector = app
+                .strictConfig()
                 .doNotInitializeLogging()
                 .setRequiredConfigurationProperties(config)
                 .initialize();

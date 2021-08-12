@@ -42,6 +42,7 @@ public class FileAuthenticatorFactory
                 });
 
         Injector injector = app
+                .strictConfig()
                 .doNotInitializeLogging()
                 .setRequiredConfigurationProperties(config)
                 .initialize();

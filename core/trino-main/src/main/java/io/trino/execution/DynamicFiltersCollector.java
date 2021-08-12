@@ -73,19 +73,14 @@ public class DynamicFiltersCollector
 
     public synchronized VersionedDynamicFilterDomains acknowledgeAndGetNewDomains(long callersCurrentVersion)
     {
-        acknowledge(callersCurrentVersion);
+        // Remove dynamic filter domains that are already received by caller.
+        // This assumes there is only one dynamic filters consumer.
+        dynamicFilterDomains.values().removeIf(domain -> domain.getVersion() <= callersCurrentVersion);
 
         return new VersionedDynamicFilterDomains(
                 currentVersion,
                 dynamicFilterDomains.entrySet().stream()
                         .collect(toImmutableMap(Map.Entry::getKey, entry -> entry.getValue().getDomain())));
-    }
-
-    public synchronized void acknowledge(long callersCurrentVersion)
-    {
-        // Remove dynamic filter domains that are already received by caller.
-        // This assumes there is only one dynamic filters consumer.
-        dynamicFilterDomains.values().removeIf(domain -> domain.getVersion() <= callersCurrentVersion);
     }
 
     public static class VersionedDynamicFilterDomains

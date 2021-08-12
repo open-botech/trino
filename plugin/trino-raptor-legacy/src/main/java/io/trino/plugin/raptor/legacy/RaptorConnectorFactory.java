@@ -85,6 +85,7 @@ public class RaptorConnectorFactory
                 new RaptorSecurityModule(catalogName));
 
         Injector injector = app
+                .strictConfig()
                 .doNotInitializeLogging()
                 .setRequiredConfigurationProperties(config)
                 .initialize();

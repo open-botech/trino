@@ -68,7 +68,7 @@ public class PinotConnectorFactory
 
         Bootstrap app = new Bootstrap(modulesBuilder.build());
 
-        Injector injector = app
+        Injector injector = app.strictConfig()
                 .doNotInitializeLogging()
                 .setRequiredConfigurationProperties(config)
                 .initialize();

@@ -16,7 +16,6 @@ package io.trino.metadata;
 import com.google.common.collect.ImmutableList;
 import io.trino.Session;
 import io.trino.connector.CatalogName;
-import io.trino.spi.connector.CatalogSchemaName;
 import io.trino.spi.connector.ConnectorCapabilities;
 import io.trino.spi.connector.ConnectorMetadata;
 import io.trino.spi.connector.ConnectorTransactionHandle;
@@ -105,14 +104,6 @@ public class CatalogMetadata
             return systemTablesTransactionHandle;
         }
         throw new IllegalArgumentException("Unknown connector id: " + catalogName);
-    }
-
-    public CatalogName getConnectorIdForSchema(CatalogSchemaName schema)
-    {
-        if (schema.getSchemaName().equals(INFORMATION_SCHEMA_NAME)) {
-            return informationSchemaId;
-        }
-        return catalogName;
     }
 
     public CatalogName getConnectorId(Session session, QualifiedObjectName table)

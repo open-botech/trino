@@ -21,7 +21,6 @@ import io.trino.spi.Page;
 import io.trino.spi.block.Block;
 import io.trino.spi.block.BlockBuilder;
 import io.trino.spi.block.RunLengthEncodedBlock;
-import io.trino.spi.security.ConnectorIdentity;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.io.AcidUtils;
@@ -155,7 +154,7 @@ public class TestOrcDeletedRows
         JobConf configuration = new JobConf(new Configuration(false));
         OrcDeleteDeltaPageSourceFactory pageSourceFactory = new OrcDeleteDeltaPageSourceFactory(
                 new OrcReaderOptions(),
-                ConnectorIdentity.ofUser("test"),
+                "test",
                 configuration,
                 HDFS_ENVIRONMENT,
                 new FileFormatDataSourceStats());
@@ -163,7 +162,7 @@ public class TestOrcDeletedRows
         return new OrcDeletedRows(
                 sourceFileName,
                 pageSourceFactory,
-                ConnectorIdentity.ofUser("test"),
+                "test",
                 configuration,
                 HDFS_ENVIRONMENT,
                 acidInfo,

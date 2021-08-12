@@ -69,6 +69,7 @@ public class ThriftConnectorFactory
                 new ThriftModule());
 
         Injector injector = app
+                .strictConfig()
                 .doNotInitializeLogging()
                 .setRequiredConfigurationProperties(config)
                 .initialize();

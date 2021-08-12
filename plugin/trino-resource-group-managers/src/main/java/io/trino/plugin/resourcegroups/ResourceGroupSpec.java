@@ -83,21 +83,25 @@ public class ResourceGroupSpec
         this.schedulingWeight = requireNonNull(schedulingWeight, "schedulingWeight is null");
 
         requireNonNull(softMemoryLimit, "softMemoryLimit is null");
+        Optional<DataSize> absoluteSize;
+        Optional<Double> fraction;
         Matcher matcher = PERCENT_PATTERN.matcher(softMemoryLimit);
         if (matcher.matches()) {
-            this.softMemoryLimit = Optional.empty();
-            this.softMemoryLimitFraction = Optional.of(Double.parseDouble(matcher.group(1)) / 100.0);
-            checkArgument(softMemoryLimitFraction.get() <= 1.0, "softMemoryLimit percentage is over 100%");
+            absoluteSize = Optional.empty();
+            fraction = Optional.of(Double.parseDouble(matcher.group(1)) / 100.0);
         }
         else {
-            this.softMemoryLimit = Optional.of(DataSize.valueOf(softMemoryLimit));
-            this.softMemoryLimitFraction = Optional.empty();
+            absoluteSize = Optional.of(DataSize.valueOf(softMemoryLimit));
+            fraction = Optional.empty();
         }
+        this.softMemoryLimit = absoluteSize;
+        this.softMemoryLimitFraction = fraction;
 
         this.subGroups = ImmutableList.copyOf(requireNonNull(subGroups, "subGroups is null").orElse(ImmutableList.of()));
         Set<ResourceGroupNameTemplate> names = new HashSet<>();
         for (ResourceGroupSpec subGroup : this.subGroups) {
-            checkArgument(names.add(subGroup.getName()), "Duplicated sub group: %s", subGroup.getName());
+            checkArgument(!names.contains(subGroup.getName()), "Duplicated sub group: %s", subGroup.getName());
+            names.add(subGroup.getName());
         }
     }
 

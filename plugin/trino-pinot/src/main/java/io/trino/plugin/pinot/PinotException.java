@@ -22,16 +22,17 @@ import static java.util.Objects.requireNonNull;
 public class PinotException
         extends TrinoException
 {
-    private final boolean retryable;
+    private final Optional<String> query;
+    private final boolean retriable;
 
     public PinotException(PinotErrorCode errorCode, Optional<String> query, String message)
     {
         this(errorCode, query, message, false, null);
     }
 
-    public PinotException(PinotErrorCode errorCode, Optional<String> query, String message, boolean retryable)
+    public PinotException(PinotErrorCode errorCode, Optional<String> query, String message, boolean retriable)
     {
-        this(errorCode, query, message, retryable, null);
+        this(errorCode, query, message, retriable, null);
     }
 
     public PinotException(PinotErrorCode errorCode, Optional<String> query, String message, Throwable throwable)
@@ -39,22 +40,22 @@ public class PinotException
         this(errorCode, query, message, false, throwable);
     }
 
-    public PinotException(PinotErrorCode errorCode, Optional<String> query, String message, boolean retryable, Throwable throwable)
+    public PinotException(PinotErrorCode errorCode, Optional<String> query, String message, boolean retriable, Throwable throwable)
     {
-        super(requireNonNull(errorCode, "errorCode is null"), formatMessage(query, message), throwable);
-        this.retryable = retryable;
+        super(requireNonNull(errorCode, "errorCode is null"), requireNonNull(message, "message is null"), throwable);
+        this.retriable = retriable;
+        this.query = requireNonNull(query, "query is null");
     }
 
-    public boolean isRetryable()
+    public boolean isRetriable()
     {
-        return retryable;
+        return retriable;
     }
 
-    private static String formatMessage(Optional<String> query, String message)
+    @Override
+    public String getMessage()
     {
-        requireNonNull(query, "query is null");
-        requireNonNull(message, "message is null");
-
+        String message = super.getMessage();
         if (query.isPresent()) {
             message += " with query \"" + query.get() + "\"";
         }

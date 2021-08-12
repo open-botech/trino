@@ -57,7 +57,6 @@ import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.connector.DynamicFilter;
 import io.trino.spi.predicate.Domain;
 import io.trino.spi.predicate.TupleDomain;
-import io.trino.spi.security.ConnectorIdentity;
 import io.trino.spi.type.StandardTypes;
 import io.trino.spi.type.Type;
 import org.apache.hadoop.conf.Configuration;
@@ -193,7 +192,7 @@ public class IcebergPageSourceProvider
     {
         if (!isUseFileSizeFromMetadata(session)) {
             try {
-                FileStatus fileStatus = hdfsEnvironment.doAs(session.getIdentity(),
+                FileStatus fileStatus = hdfsEnvironment.doAs(session.getUser(),
                         () -> hdfsEnvironment.getFileSystem(hdfsContext, path).getFileStatus(path));
                 fileSize = fileStatus.getLen();
             }
@@ -206,7 +205,7 @@ public class IcebergPageSourceProvider
             case ORC:
                 return createOrcPageSource(
                         hdfsEnvironment,
-                        session.getIdentity(),
+                        session.getUser(),
                         hdfsEnvironment.getConfiguration(hdfsContext, path),
                         path,
                         start,
@@ -227,7 +226,7 @@ public class IcebergPageSourceProvider
             case PARQUET:
                 return createParquetPageSource(
                         hdfsEnvironment,
-                        session.getIdentity(),
+                        session.getUser(),
                         hdfsEnvironment.getConfiguration(hdfsContext, path),
                         path,
                         start,
@@ -245,7 +244,7 @@ public class IcebergPageSourceProvider
 
     private static ConnectorPageSource createOrcPageSource(
             HdfsEnvironment hdfsEnvironment,
-            ConnectorIdentity identity,
+            String user,
             Configuration configuration,
             Path path,
             long start,
@@ -258,8 +257,8 @@ public class IcebergPageSourceProvider
     {
         OrcDataSource orcDataSource = null;
         try {
-            FileSystem fileSystem = hdfsEnvironment.getFileSystem(identity, path, configuration);
-            FSDataInputStream inputStream = hdfsEnvironment.doAs(identity, () -> fileSystem.open(path));
+            FileSystem fileSystem = hdfsEnvironment.getFileSystem(user, path, configuration);
+            FSDataInputStream inputStream = hdfsEnvironment.doAs(user, () -> fileSystem.open(path));
             orcDataSource = new HdfsOrcDataSource(
                     new OrcDataSourceId(path.toString()),
                     fileSize,
@@ -427,7 +426,7 @@ public class IcebergPageSourceProvider
 
     private static ConnectorPageSource createParquetPageSource(
             HdfsEnvironment hdfsEnvironment,
-            ConnectorIdentity identity,
+            String user,
             Configuration configuration,
             Path path,
             long start,
@@ -442,11 +441,11 @@ public class IcebergPageSourceProvider
 
         ParquetDataSource dataSource = null;
         try {
-            FileSystem fileSystem = hdfsEnvironment.getFileSystem(identity, path, configuration);
-            FSDataInputStream inputStream = hdfsEnvironment.doAs(identity, () -> fileSystem.open(path));
+            FileSystem fileSystem = hdfsEnvironment.getFileSystem(user, path, configuration);
+            FSDataInputStream inputStream = hdfsEnvironment.doAs(user, () -> fileSystem.open(path));
             dataSource = new HdfsParquetDataSource(new ParquetDataSourceId(path.toString()), fileSize, inputStream, fileFormatDataSourceStats, options);
             ParquetDataSource theDataSource = dataSource; // extra variable required for lambda below
-            ParquetMetadata parquetMetadata = hdfsEnvironment.doAs(identity, () -> MetadataReader.readFooter(theDataSource));
+            ParquetMetadata parquetMetadata = hdfsEnvironment.doAs(user, () -> MetadataReader.readFooter(theDataSource));
             FileMetaData fileMetaData = parquetMetadata.getFileMetaData();
             MessageType fileSchema = fileMetaData.getSchema();
 

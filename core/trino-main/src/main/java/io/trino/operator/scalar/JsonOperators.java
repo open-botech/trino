@@ -14,7 +14,6 @@
 package io.trino.operator.scalar;
 
 import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonFactoryBuilder;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import io.airlift.slice.DynamicSliceOutput;
@@ -61,7 +60,7 @@ import static java.lang.String.format;
 
 public final class JsonOperators
 {
-    public static final JsonFactory JSON_FACTORY = new JsonFactoryBuilder().disable(CANONICALIZE_FIELD_NAMES).build();
+    public static final JsonFactory JSON_FACTORY = new JsonFactory().disable(CANONICALIZE_FIELD_NAMES);
 
     private JsonOperators()
     {

@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static io.trino.spi.function.InvocationConvention.InvocationArgumentConvention.BLOCK_POSITION;
 import static io.trino.spi.function.InvocationConvention.InvocationArgumentConvention.BOXED_NULLABLE;
@@ -115,7 +116,7 @@ public class RowType
         this.fields = fields;
         this.fieldTypes = fields.stream()
                 .map(Field::getType)
-                .collect(toUnmodifiableList());
+                .collect(Collectors.toList());
 
         this.comparable = fields.stream().allMatch(field -> field.getType().isComparable());
         this.orderable = fields.stream().allMatch(field -> field.getType().isOrderable());
@@ -130,7 +131,7 @@ public class RowType
     {
         List<Field> fields = types.stream()
                 .map(type -> new Field(Optional.empty(), type))
-                .collect(toUnmodifiableList());
+                .collect(Collectors.toList());
 
         return new RowType(makeSignature(fields), fields);
     }
@@ -171,7 +172,7 @@ public class RowType
         List<TypeSignatureParameter> parameters = fields.stream()
                 .map(field -> new NamedTypeSignature(field.getName().map(RowFieldName::new), field.getType().getTypeSignature()))
                 .map(TypeSignatureParameter::namedTypeParameter)
-                .collect(toUnmodifiableList());
+                .collect(Collectors.toList());
 
         return new TypeSignature(ROW, parameters);
     }

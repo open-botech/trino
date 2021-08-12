@@ -250,7 +250,7 @@ public class InformationSchemaPageSource
     {
         for (Map.Entry<SchemaTableName, List<ColumnMetadata>> entry : listTableColumns(session, metadata, accessControl, prefix).entrySet()) {
             SchemaTableName tableName = entry.getKey();
-            long ordinalPosition = 1;
+            int ordinalPosition = 1;
 
             for (ColumnMetadata column : entry.getValue()) {
                 if (column.isHidden()) {

@@ -110,8 +110,8 @@ statement
         FROM grantee=principal                                         #revoke
     | SHOW GRANTS
         (ON TABLE? qualifiedName)?                                     #showGrants
-    | EXPLAIN ('(' explainOption (',' explainOption)* ')')? statement  #explain
-    | EXPLAIN ANALYZE VERBOSE? statement                               #explainAnalyze
+    | EXPLAIN ANALYZE? VERBOSE?
+        ('(' explainOption (',' explainOption)* ')')? statement        #explain
     | SHOW CREATE TABLE qualifiedName                                  #showCreateTable
     | SHOW CREATE SCHEMA qualifiedName                                 #showCreateSchema
     | SHOW CREATE VIEW qualifiedName                                   #showCreateView

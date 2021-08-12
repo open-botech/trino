@@ -14,13 +14,11 @@
 package io.trino.metadata;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import io.airlift.json.JsonCodec;
 import io.airlift.json.JsonCodecFactory;
 import io.trino.Session;
 import io.trino.SystemSessionProperties;
-import io.trino.SystemSessionPropertiesProvider;
 import io.trino.connector.CatalogName;
 import io.trino.security.AccessControl;
 import io.trino.spi.TrinoException;
@@ -47,14 +45,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
-import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkState;
-import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.trino.spi.StandardErrorCode.INVALID_SESSION_PROPERTY;
 import static io.trino.spi.type.TypeUtils.writeNativeValue;
 import static io.trino.sql.planner.ExpressionInterpreter.evaluateConstantExpression;
@@ -72,18 +68,10 @@ public final class SessionPropertyManager
         this(new SystemSessionProperties());
     }
 
-    public SessionPropertyManager(SystemSessionPropertiesProvider systemSessionPropertiesProvider)
-    {
-        this(ImmutableSet.of(systemSessionPropertiesProvider));
-    }
-
     @Inject
-    public SessionPropertyManager(Set<SystemSessionPropertiesProvider> systemSessionProperties)
+    public SessionPropertyManager(SystemSessionProperties systemSessionProperties)
     {
-        this(systemSessionProperties
-                .stream()
-                .flatMap(provider -> provider.getSessionProperties().stream())
-                .collect(toImmutableList()));
+        this(systemSessionProperties.getSessionProperties());
     }
 
     public SessionPropertyManager(List<PropertyMetadata<?>> systemSessionProperties)

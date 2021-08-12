@@ -35,7 +35,6 @@ import io.trino.memory.QueryContextVisitor;
 import io.trino.memory.context.LocalMemoryContext;
 import io.trino.memory.context.MemoryTrackingContext;
 import io.trino.spi.predicate.Domain;
-import io.trino.sql.planner.LocalDynamicFiltersCollector;
 import io.trino.sql.planner.plan.DynamicFilterId;
 import org.joda.time.DateTime;
 
@@ -98,24 +97,15 @@ public class TaskContext
 
     private final Object cumulativeMemoryLock = new Object();
     private final AtomicDouble cumulativeUserMemory = new AtomicDouble(0.0);
-    private final AtomicDouble cumulativeSystemMemory = new AtomicDouble(0.0);
 
     @GuardedBy("cumulativeMemoryLock")
     private long lastUserMemoryReservation;
-
-    @GuardedBy("cumulativeMemoryLock")
-    private long lastSystemMemoryReservation;
 
     @GuardedBy("cumulativeMemoryLock")
     private long lastTaskStatCallNanos;
 
     private final MemoryTrackingContext taskMemoryContext;
     private final DynamicFiltersCollector dynamicFiltersCollector;
-
-    // The collector is shared for dynamic filters collected from coordinator
-    // as well as from local build-side of replicated joins. It is also shared with
-    // with multiple table scans (e.g. co-located joins).
-    private final LocalDynamicFiltersCollector localDynamicFiltersCollector;
 
     public static TaskContext createTaskContext(
             QueryContext queryContext,
@@ -169,7 +159,6 @@ public class TaskContext
         // Initialize the local memory contexts with the LazyOutputBuffer tag as LazyOutputBuffer will do the local memory allocations
         taskMemoryContext.initializeLocalMemoryContexts(LazyOutputBuffer.class.getSimpleName());
         this.dynamicFiltersCollector = new DynamicFiltersCollector(notifyStatusChanged);
-        this.localDynamicFiltersCollector = new LocalDynamicFiltersCollector(session);
         this.perOperatorCpuTimerEnabled = perOperatorCpuTimerEnabled;
         this.cpuTimerEnabled = cpuTimerEnabled;
         this.totalPartitions = requireNonNull(totalPartitions, "totalPartitions is null");
@@ -518,19 +507,14 @@ public class TaskContext
         Duration fullGcTime = getFullGcTime();
 
         long userMemory = taskMemoryContext.getUserMemory();
-        long systemMemory = taskMemoryContext.getSystemMemory();
 
         synchronized (cumulativeMemoryLock) {
-            long currentTimeNanos = System.nanoTime();
-            double sinceLastPeriodMillis = (currentTimeNanos - lastTaskStatCallNanos) / 1_000_000.0;
-            long averageUserMemoryForLastPeriod = (userMemory + lastUserMemoryReservation) / 2;
-            cumulativeUserMemory.addAndGet(averageUserMemoryForLastPeriod * sinceLastPeriodMillis);
-            long averageSystemMemoryForLastPeriod = (systemMemory + lastSystemMemoryReservation) / 2;
-            cumulativeSystemMemory.addAndGet(averageSystemMemoryForLastPeriod * sinceLastPeriodMillis);
+            double sinceLastPeriodMillis = (System.nanoTime() - lastTaskStatCallNanos) / 1_000_000.0;
+            long averageMemoryForLastPeriod = (userMemory + lastUserMemoryReservation) / 2;
+            cumulativeUserMemory.addAndGet(averageMemoryForLastPeriod * sinceLastPeriodMillis);
 
-            lastTaskStatCallNanos = currentTimeNanos;
+            lastTaskStatCallNanos = System.nanoTime();
             lastUserMemoryReservation = userMemory;
-            lastSystemMemoryReservation = systemMemory;
         }
 
         Set<PipelineStats> runningPipelineStats = pipelineStats.stream()
@@ -558,10 +542,9 @@ public class TaskContext
                 blockedDrivers,
                 completedDrivers,
                 cumulativeUserMemory.get(),
-                cumulativeSystemMemory.get(),
                 succinctBytes(userMemory),
                 succinctBytes(taskMemoryContext.getRevocableMemory()),
-                succinctBytes(systemMemory),
+                succinctBytes(taskMemoryContext.getSystemMemory()),
                 new Duration(totalScheduledTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalCpuTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
                 new Duration(totalBlockedTime, NANOSECONDS).convertToMostSuccinctTimeUnit(),
@@ -606,15 +589,5 @@ public class TaskContext
     public QueryContext getQueryContext()
     {
         return queryContext;
-    }
-
-    public LocalDynamicFiltersCollector getLocalDynamicFiltersCollector()
-    {
-        return localDynamicFiltersCollector;
-    }
-
-    public void addDynamicFilter(Map<DynamicFilterId, Domain> dynamicFilterDomains)
-    {
-        localDynamicFiltersCollector.collectDynamicFilterDomains(dynamicFilterDomains);
     }
 }

@@ -23,7 +23,6 @@ import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
 import io.trino.metadata.Metadata;
 import io.trino.spi.connector.SortOrder;
-import io.trino.spi.type.Type;
 import io.trino.sql.ExpressionUtils;
 import io.trino.sql.planner.OrderingScheme;
 import io.trino.sql.planner.Symbol;
@@ -44,11 +43,9 @@ import io.trino.sql.planner.plan.RowNumberNode;
 import io.trino.sql.planner.plan.TopNNode;
 import io.trino.sql.planner.plan.TopNRankingNode;
 import io.trino.sql.planner.plan.WindowNode.Specification;
-import io.trino.sql.tree.Cast;
 import io.trino.sql.tree.ComparisonExpression;
 import io.trino.sql.tree.Expression;
 import io.trino.sql.tree.SymbolReference;
-import io.trino.type.TypeCoercion;
 
 import java.util.List;
 import java.util.Map;
@@ -60,8 +57,6 @@ import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static io.trino.spi.type.BigintType.BIGINT;
-import static io.trino.sql.analyzer.TypeSignatureTranslator.toTypeSignature;
-import static io.trino.sql.planner.DeterminismEvaluator.isDeterministic;
 import static io.trino.sql.planner.optimizations.SymbolMapper.symbolMapper;
 import static io.trino.sql.planner.plan.AggregationNode.singleGroupingSet;
 import static io.trino.sql.planner.plan.TopNRankingNode.RankingType.ROW_NUMBER;
@@ -74,14 +69,12 @@ public class PlanNodeDecorrelator
     private final Metadata metadata;
     private final SymbolAllocator symbolAllocator;
     private final Lookup lookup;
-    private final TypeCoercion typeCoercion;
 
     public PlanNodeDecorrelator(Metadata metadata, SymbolAllocator symbolAllocator, Lookup lookup)
     {
         this.metadata = requireNonNull(metadata, "metadata is null");
         this.symbolAllocator = requireNonNull(symbolAllocator, "symbolAllocator is null");
         this.lookup = requireNonNull(lookup, "lookup is null");
-        this.typeCoercion = new TypeCoercion(metadata::getType);
     }
 
     public Optional<DecorrelatedNode> decorrelateFilters(PlanNode node, List<Symbol> correlation)
@@ -120,7 +113,6 @@ public class PlanNodeDecorrelator
                     ImmutableSet.of(),
                     ImmutableList.of(),
                     ImmutableMultimap.of(),
-                    ImmutableSet.of(),
                     false));
         }
 
@@ -138,7 +130,6 @@ public class PlanNodeDecorrelator
                     ImmutableSet.of(),
                     ImmutableList.of(),
                     ImmutableMultimap.of(),
-                    ImmutableSet.of(),
                     false));
 
             // try to decorrelate filters down the tree
@@ -173,10 +164,6 @@ public class PlanNodeDecorrelator
                     ImmutableMultimap.<Symbol, Symbol>builder()
                             .putAll(childDecorrelationResult.correlatedSymbolsMapping)
                             .putAll(extractCorrelatedSymbolsMapping(correlatedPredicates))
-                            .build(),
-                    ImmutableSet.<Symbol>builder()
-                            .addAll(childDecorrelationResult.constantSymbols)
-                            .addAll(extractConstantSymbols(correlatedPredicates))
                             .build(),
                     childDecorrelationResult.atMostSingleRow));
         }
@@ -243,7 +230,6 @@ public class PlanNodeDecorrelator
                     childDecorrelationResult.symbolsToPropagate,
                     childDecorrelationResult.correlatedPredicates,
                     childDecorrelationResult.correlatedSymbolsMapping,
-                    childDecorrelationResult.constantSymbols,
                     true));
         }
 
@@ -258,7 +244,6 @@ public class PlanNodeDecorrelator
                         childDecorrelationResult.symbolsToPropagate,
                         childDecorrelationResult.correlatedPredicates,
                         childDecorrelationResult.correlatedSymbolsMapping,
-                        childDecorrelationResult.constantSymbols,
                         false));
             }
 
@@ -282,7 +267,6 @@ public class PlanNodeDecorrelator
                     childDecorrelationResult.symbolsToPropagate,
                     childDecorrelationResult.correlatedPredicates,
                     childDecorrelationResult.correlatedSymbolsMapping,
-                    childDecorrelationResult.constantSymbols,
                     false));
         }
 
@@ -316,7 +300,6 @@ public class PlanNodeDecorrelator
                                 childDecorrelationResult.symbolsToPropagate,
                                 childDecorrelationResult.correlatedPredicates,
                                 childDecorrelationResult.correlatedSymbolsMapping,
-                                childDecorrelationResult.constantSymbols,
                                 node.getCount() == 1))
                         .or(() -> Optional.of(new DecorrelationResult(
                                 // no ordering symbols are left - convert to LimitNode
@@ -324,7 +307,6 @@ public class PlanNodeDecorrelator
                                 childDecorrelationResult.symbolsToPropagate,
                                 childDecorrelationResult.correlatedPredicates,
                                 childDecorrelationResult.correlatedSymbolsMapping,
-                                childDecorrelationResult.constantSymbols,
                                 node.getCount() == 1)));
             }
 
@@ -352,7 +334,6 @@ public class PlanNodeDecorrelator
                                 childDecorrelationResult.symbolsToPropagate,
                                 childDecorrelationResult.correlatedPredicates,
                                 childDecorrelationResult.correlatedSymbolsMapping,
-                                childDecorrelationResult.constantSymbols,
                                 node.getCount() == 1));
                     })
                     .orElseGet(() -> {
@@ -371,7 +352,6 @@ public class PlanNodeDecorrelator
                                 childDecorrelationResult.symbolsToPropagate,
                                 childDecorrelationResult.correlatedPredicates,
                                 childDecorrelationResult.correlatedSymbolsMapping,
-                                childDecorrelationResult.constantSymbols,
                                 node.getCount() == 1));
                     });
         }
@@ -456,7 +436,6 @@ public class PlanNodeDecorrelator
                     childDecorrelationResult.symbolsToPropagate,
                     childDecorrelationResult.correlatedPredicates,
                     childDecorrelationResult.correlatedSymbolsMapping,
-                    childDecorrelationResult.constantSymbols,
                     constantSymbols.containsAll(newAggregation.getGroupingKeys())));
         }
 
@@ -484,12 +463,12 @@ public class PlanNodeDecorrelator
                     childDecorrelationResult.symbolsToPropagate,
                     childDecorrelationResult.correlatedPredicates,
                     childDecorrelationResult.correlatedSymbolsMapping,
-                    childDecorrelationResult.constantSymbols,
                     childDecorrelationResult.atMostSingleRow));
         }
 
         private Multimap<Symbol, Symbol> extractCorrelatedSymbolsMapping(List<Expression> correlatedConjuncts)
         {
+            // TODO: handle coercions and non-direct column references
             ImmutableMultimap.Builder<Symbol, Symbol> mapping = ImmutableMultimap.builder();
             for (Expression conjunct : correlatedConjuncts) {
                 if (!(conjunct instanceof ComparisonExpression)) {
@@ -518,63 +497,6 @@ public class PlanNodeDecorrelator
             return mapping.build();
         }
 
-        private Set<Symbol> extractConstantSymbols(List<Expression> correlatedConjuncts)
-        {
-            ImmutableSet.Builder<Symbol> constants = ImmutableSet.builder();
-
-            correlatedConjuncts.stream()
-                    .filter(ComparisonExpression.class::isInstance)
-                    .map(ComparisonExpression.class::cast)
-                    .filter(comparison -> comparison.getOperator() == EQUAL)
-                    .forEach(comparison -> {
-                        Expression left = comparison.getLeft();
-                        Expression right = comparison.getRight();
-
-                        if (!isCorrelated(left) && (left instanceof SymbolReference || isSimpleInjectiveCast(left)) && isConstant(right)) {
-                            constants.add(getSymbol(left));
-                        }
-
-                        if (!isCorrelated(right) && (right instanceof SymbolReference || isSimpleInjectiveCast(right)) && isConstant(left)) {
-                            constants.add(getSymbol(right));
-                        }
-                    });
-
-            return constants.build();
-        }
-
-        // checks whether the expression is a deterministic combination of correlation symbols
-        private boolean isConstant(Expression expression)
-        {
-            return isDeterministic(expression, metadata) &&
-                    ImmutableSet.copyOf(correlation).containsAll(SymbolsExtractor.extractUnique(expression));
-        }
-
-        // checks whether the expression is an injective cast over a symbol
-        private boolean isSimpleInjectiveCast(Expression expression)
-        {
-            if (!(expression instanceof Cast)) {
-                return false;
-            }
-            Cast cast = (Cast) expression;
-            if (!(cast.getExpression() instanceof SymbolReference)) {
-                return false;
-            }
-            Symbol sourceSymbol = Symbol.from(cast.getExpression());
-
-            Type sourceType = symbolAllocator.getTypes().get(sourceSymbol);
-            Type targetType = metadata.getType(toTypeSignature(((Cast) expression).getType()));
-
-            return typeCoercion.isInjectiveCoercion(sourceType, targetType);
-        }
-
-        private Symbol getSymbol(Expression expression)
-        {
-            if (expression instanceof SymbolReference) {
-                return Symbol.from(expression);
-            }
-            return Symbol.from(((Cast) expression).getExpression());
-        }
-
         private boolean isCorrelated(Expression expression)
         {
             return correlation.stream().anyMatch(SymbolsExtractor.extractUnique(expression)::contains);
@@ -589,27 +511,17 @@ public class PlanNodeDecorrelator
 
         // mapping from correlated symbols to their uncorrelated equivalence
         final Multimap<Symbol, Symbol> correlatedSymbolsMapping;
-
-        // local (uncorrelated) symbols known to be constant based on their dependency on correlation symbols
-        // they are derived from the filter predicate, e.g.
-        // a = corr --> a is constant
-        // b = f(corr_1, corr_2, ...) --> b is constant provided that f is deterministic
-        // cast(c AS ...) = corr --> c is constant provided that cast is injective
-        final Set<Symbol> constantSymbols;
-
         // If a subquery has at most single row for any correlation values?
         final boolean atMostSingleRow;
 
-        DecorrelationResult(PlanNode node, Set<Symbol> symbolsToPropagate, List<Expression> correlatedPredicates, Multimap<Symbol, Symbol> correlatedSymbolsMapping, Set<Symbol> constantSymbols, boolean atMostSingleRow)
+        DecorrelationResult(PlanNode node, Set<Symbol> symbolsToPropagate, List<Expression> correlatedPredicates, Multimap<Symbol, Symbol> correlatedSymbolsMapping, boolean atMostSingleRow)
         {
             this.node = node;
             this.symbolsToPropagate = symbolsToPropagate;
             this.correlatedPredicates = correlatedPredicates;
             this.atMostSingleRow = atMostSingleRow;
             this.correlatedSymbolsMapping = correlatedSymbolsMapping;
-            this.constantSymbols = constantSymbols;
-            checkState(constantSymbols.containsAll(correlatedSymbolsMapping.values()), "Expected constant symbols to contain all correlated symbols local equivalents");
-            checkState(symbolsToPropagate.containsAll(constantSymbols), "Expected symbols to propagate to contain all constant symbols");
+            checkState(symbolsToPropagate.containsAll(correlatedSymbolsMapping.values()), "Expected symbols to propagate to contain all constant symbols");
         }
 
         SymbolMapper getCorrelatedSymbolMapper()
@@ -623,7 +535,7 @@ public class PlanNodeDecorrelator
          */
         Set<Symbol> getConstantSymbols()
         {
-            return constantSymbols;
+            return ImmutableSet.copyOf(correlatedSymbolsMapping.values());
         }
     }
 

@@ -217,10 +217,7 @@ public class TableScanWorkProcessorOperator
 
         long getPhysicalInputPositions()
         {
-            if (source == null) {
-                return 0;
-            }
-            return source.getCompletedPositions().orElse(processedPositions);
+            return processedPositions;
         }
 
         DataSize getInputDataSize()

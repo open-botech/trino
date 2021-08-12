@@ -26,13 +26,9 @@ import io.trino.plugin.base.CatalogName;
 import io.trino.plugin.base.classloader.ClassLoaderSafeSystemTable;
 import io.trino.plugin.hive.HdfsEnvironment;
 import io.trino.plugin.hive.HdfsEnvironment.HdfsContext;
-import io.trino.plugin.hive.HiveMetadata;
 import io.trino.plugin.hive.HiveSchemaProperties;
-import io.trino.plugin.hive.HiveViewNotSupportedException;
 import io.trino.plugin.hive.HiveWrittenPartitions;
 import io.trino.plugin.hive.TableAlreadyExistsException;
-import io.trino.plugin.hive.ViewAlreadyExistsException;
-import io.trino.plugin.hive.ViewReaderUtil;
 import io.trino.plugin.hive.authentication.HiveIdentity;
 import io.trino.plugin.hive.metastore.Column;
 import io.trino.plugin.hive.metastore.Database;
@@ -40,7 +36,6 @@ import io.trino.plugin.hive.metastore.HiveMetastore;
 import io.trino.plugin.hive.metastore.HivePrincipal;
 import io.trino.plugin.hive.metastore.PrincipalPrivileges;
 import io.trino.plugin.hive.metastore.Table;
-import io.trino.plugin.hive.util.HiveUtil;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.CatalogSchemaName;
 import io.trino.spi.connector.CatalogSchemaTableName;
@@ -56,7 +51,6 @@ import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.ConnectorTableProperties;
-import io.trino.spi.connector.ConnectorViewDefinition;
 import io.trino.spi.connector.Constraint;
 import io.trino.spi.connector.ConstraintApplicationResult;
 import io.trino.spi.connector.DiscretePredicates;
@@ -67,7 +61,6 @@ import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.SchemaTablePrefix;
 import io.trino.spi.connector.SystemTable;
 import io.trino.spi.connector.TableNotFoundException;
-import io.trino.spi.connector.ViewNotFoundException;
 import io.trino.spi.predicate.Domain;
 import io.trino.spi.predicate.NullableValue;
 import io.trino.spi.predicate.TupleDomain;
@@ -101,6 +94,7 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -122,15 +116,13 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static com.google.common.collect.ImmutableMap.toImmutableMap;
 import static com.google.common.collect.ImmutableSet.toImmutableSet;
 import static io.trino.plugin.hive.HiveErrorCode.HIVE_INVALID_METADATA;
+import static io.trino.plugin.hive.HiveMetadata.PRESTO_QUERY_ID_NAME;
 import static io.trino.plugin.hive.HiveMetadata.STORAGE_TABLE;
 import static io.trino.plugin.hive.HiveMetadata.TABLE_COMMENT;
 import static io.trino.plugin.hive.HiveType.HIVE_STRING;
 import static io.trino.plugin.hive.ViewReaderUtil.PRESTO_VIEW_FLAG;
-import static io.trino.plugin.hive.ViewReaderUtil.encodeViewData;
-import static io.trino.plugin.hive.ViewReaderUtil.isPrestoView;
 import static io.trino.plugin.hive.metastore.MetastoreUtil.buildInitialPrivilegeSet;
 import static io.trino.plugin.hive.metastore.StorageFormat.VIEW_STORAGE_FORMAT;
-import static io.trino.plugin.hive.util.HiveUtil.isHiveSystemSchema;
 import static io.trino.plugin.hive.util.HiveWriteUtils.getTableDefaultLocation;
 import static io.trino.plugin.iceberg.ExpressionConverter.toIcebergExpression;
 import static io.trino.plugin.iceberg.IcebergColumnHandle.primitiveIcebergColumnHandle;
@@ -162,7 +154,6 @@ import static io.trino.spi.StandardErrorCode.ALREADY_EXISTS;
 import static io.trino.spi.StandardErrorCode.INVALID_SCHEMA_PROPERTY;
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static io.trino.spi.StandardErrorCode.SCHEMA_NOT_EMPTY;
-import static io.trino.spi.StandardErrorCode.TABLE_NOT_FOUND;
 import static io.trino.spi.type.BigintType.BIGINT;
 import static java.util.Collections.singletonList;
 import static java.util.Objects.requireNonNull;
@@ -183,25 +174,15 @@ public class IcebergMetadata
     private static final String ICEBERG_MATERIALIZED_VIEW_COMMENT = "Presto Materialized View";
     public static final String DEPENDS_ON_TABLES = "dependsOnTables";
 
-    // Be compatible with views defined by the Hive connector, which can be useful under certain conditions.
-    private static final String TRINO_CREATED_BY = HiveMetadata.TRINO_CREATED_BY;
-    private static final String TRINO_CREATED_BY_VALUE = "Trino Iceberg connector";
-    private static final String PRESTO_VIEW_COMMENT = HiveMetadata.PRESTO_VIEW_COMMENT;
-    private static final String PRESTO_VERSION_NAME = HiveMetadata.PRESTO_VERSION_NAME;
-    private static final String PRESTO_QUERY_ID_NAME = HiveMetadata.PRESTO_QUERY_ID_NAME;
-    private static final String PRESTO_VIEW_EXPANDED_TEXT_MARKER = HiveMetadata.PRESTO_VIEW_EXPANDED_TEXT_MARKER;
-
     private final CatalogName catalogName;
     private final HiveMetastore metastore;
     private final HdfsEnvironment hdfsEnvironment;
     private final TypeManager typeManager;
     private final JsonCodec<CommitTaskData> commitTaskCodec;
     private final HiveTableOperationsProvider tableOperationsProvider;
-    private final String trinoVersion;
 
     private final Map<String, Optional<Long>> snapshotIds = new ConcurrentHashMap<>();
     private final Map<SchemaTableName, TableMetadata> tableMetadataCache = new ConcurrentHashMap<>();
-    private final ViewReaderUtil.PrestoViewReader viewReader = new ViewReaderUtil.PrestoViewReader();
 
     private Transaction transaction;
 
@@ -211,8 +192,7 @@ public class IcebergMetadata
             HdfsEnvironment hdfsEnvironment,
             TypeManager typeManager,
             JsonCodec<CommitTaskData> commitTaskCodec,
-            HiveTableOperationsProvider tableOperationsProvider,
-            String trinoVersion)
+            HiveTableOperationsProvider tableOperationsProvider)
     {
         this.catalogName = requireNonNull(catalogName, "catalogName is null");
         this.metastore = requireNonNull(metastore, "metastore is null");
@@ -220,26 +200,12 @@ public class IcebergMetadata
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.commitTaskCodec = requireNonNull(commitTaskCodec, "commitTaskCodec is null");
         this.tableOperationsProvider = requireNonNull(tableOperationsProvider, "tableOperationsProvider is null");
-        this.trinoVersion = requireNonNull(trinoVersion, "trinoVersion is null");
     }
 
     @Override
     public List<String> listSchemaNames(ConnectorSession session)
     {
-        return metastore.getAllDatabases().stream()
-                .filter(schemaName -> !HiveUtil.isHiveSystemSchema(schemaName))
-                .collect(toImmutableList());
-    }
-
-    private List<String> listSchemas(ConnectorSession session, Optional<String> schemaName)
-    {
-        if (schemaName.isPresent()) {
-            if (isHiveSystemSchema(schemaName.get())) {
-                return ImmutableList.of();
-            }
-            return ImmutableList.of(schemaName.get());
-        }
-        return listSchemaNames(session);
+        return metastore.getAllDatabases();
     }
 
     @Override
@@ -303,9 +269,6 @@ public class IcebergMetadata
     private Optional<SystemTable> getRawSystemTable(ConnectorSession session, SchemaTableName tableName)
     {
         IcebergTableName name = IcebergTableName.from(tableName.getTableName());
-        if (name.getTableType() == DATA) {
-            return Optional.empty();
-        }
 
         Optional<Table> hiveTable = metastore.getTable(new HiveIdentity(session), tableName.getSchemaName(), name.getTableName());
         if (hiveTable.isEmpty() || !isIcebergTable(hiveTable.get())) {
@@ -317,7 +280,6 @@ public class IcebergMetadata
         SchemaTableName systemTableName = new SchemaTableName(tableName.getSchemaName(), name.getTableNameWithType());
         switch (name.getTableType()) {
             case DATA:
-                // Handled above.
                 break;
             case HISTORY:
                 if (name.getSnapshotId().isPresent()) {
@@ -431,7 +393,8 @@ public class IcebergMetadata
     public List<SchemaTableName> listTables(ConnectorSession session, Optional<String> schemaName)
     {
         ImmutableList.Builder<SchemaTableName> tablesListBuilder = ImmutableList.builder();
-        listSchemas(session, schemaName)
+        schemaName.map(Collections::singletonList)
+                .orElseGet(metastore::getAllDatabases)
                 .stream()
                 .flatMap(schema -> Stream.concat(
                         // Get tables with parameter table_type set to  "ICEBERG" or "iceberg". This is required because
@@ -653,9 +616,10 @@ public class IcebergMetadata
 
         AppendFiles appendFiles = transaction.newFastAppend();
         for (CommitTaskData task : commitTasks) {
+            HdfsContext context = new HdfsContext(session);
+
             DataFiles.Builder builder = DataFiles.builder(icebergTable.spec())
-                    .withPath(task.getPath())
-                    .withFileSizeInBytes(task.getFileSizeInBytes())
+                    .withInputFile(new HdfsInputFile(new Path(task.getPath()), hdfsEnvironment, context))
                     .withFormat(table.getFileFormat())
                     .withMetrics(task.getMetrics().metrics());
 
@@ -729,12 +693,12 @@ public class IcebergMetadata
         icebergTable.updateSchema().renameColumn(columnHandle.getName(), target).commit();
     }
 
-    /**
-     * @throws TableNotFoundException when table cannot be found
-     */
     private ConnectorTableMetadata getTableMetadata(ConnectorSession session, SchemaTableName table)
     {
-        // getIcebergTable throws TableNotFoundException when table not found
+        if (metastore.getTable(new HiveIdentity(session), table.getSchemaName(), table.getTableName()).isEmpty()) {
+            throw new TableNotFoundException(table);
+        }
+
         org.apache.iceberg.Table icebergTable = getIcebergTable(session, table);
 
         List<ColumnMetadata> columns = getColumnMetadatas(icebergTable);
@@ -791,144 +755,6 @@ public class IcebergMetadata
     public ConnectorTableHandle beginDelete(ConnectorSession session, ConnectorTableHandle tableHandle)
     {
         throw new TrinoException(NOT_SUPPORTED, "This connector only supports delete where one or more partitions are deleted entirely");
-    }
-
-    @Override
-    public void createView(ConnectorSession session, SchemaTableName viewName, ConnectorViewDefinition definition, boolean replace)
-    {
-        HiveIdentity identity = new HiveIdentity(session);
-        Map<String, String> properties = ImmutableMap.<String, String>builder()
-                .put(PRESTO_VIEW_FLAG, "true")
-                .put(TRINO_CREATED_BY, TRINO_CREATED_BY_VALUE)
-                .put(PRESTO_VERSION_NAME, trinoVersion)
-                .put(PRESTO_QUERY_ID_NAME, session.getQueryId())
-                .put(TABLE_COMMENT, PRESTO_VIEW_COMMENT)
-                .build();
-
-        Table.Builder tableBuilder = Table.builder()
-                .setDatabaseName(viewName.getSchemaName())
-                .setTableName(viewName.getTableName())
-                .setOwner(session.getUser())
-                .setTableType(org.apache.hadoop.hive.metastore.TableType.VIRTUAL_VIEW.name())
-                .setDataColumns(ImmutableList.of(new Column("dummy", HIVE_STRING, Optional.empty())))
-                .setPartitionColumns(ImmutableList.of())
-                .setParameters(properties)
-                .setViewOriginalText(Optional.of(encodeViewData(definition)))
-                .setViewExpandedText(Optional.of(PRESTO_VIEW_EXPANDED_TEXT_MARKER));
-
-        tableBuilder.getStorageBuilder()
-                .setStorageFormat(VIEW_STORAGE_FORMAT)
-                .setLocation("");
-        Table table = tableBuilder.build();
-        PrincipalPrivileges principalPrivileges = buildInitialPrivilegeSet(session.getUser());
-
-        Optional<Table> existing = metastore.getTable(identity, viewName.getSchemaName(), viewName.getTableName());
-        if (existing.isPresent()) {
-            if (!replace || !isPrestoView(existing.get())) {
-                throw new ViewAlreadyExistsException(viewName);
-            }
-
-            metastore.replaceTable(identity, viewName.getSchemaName(), viewName.getTableName(), table, principalPrivileges);
-            return;
-        }
-
-        try {
-            metastore.createTable(identity, table, principalPrivileges);
-        }
-        catch (TableAlreadyExistsException e) {
-            throw new ViewAlreadyExistsException(e.getTableName());
-        }
-    }
-
-    @Override
-    public void renameView(ConnectorSession session, SchemaTableName source, SchemaTableName target)
-    {
-        // Not checking if source view exists as this is already done in RenameViewTask
-        metastore.renameTable(new HiveIdentity(session), source.getSchemaName(), source.getTableName(), target.getSchemaName(), target.getTableName());
-    }
-
-    @Override
-    public void setViewAuthorization(ConnectorSession session, SchemaTableName viewName, TrinoPrincipal principal)
-    {
-        // Not checking if view exists as this is already done in SetViewAuthorizationTask
-        setTableAuthorization(session, viewName, principal);
-    }
-
-    @Override
-    public void dropView(ConnectorSession session, SchemaTableName viewName)
-    {
-        if (getView(session, viewName).isEmpty()) {
-            throw new ViewNotFoundException(viewName);
-        }
-
-        try {
-            metastore.dropTable(new HiveIdentity(session), viewName.getSchemaName(), viewName.getTableName(), true);
-        }
-        catch (TableNotFoundException e) {
-            throw new ViewNotFoundException(e.getTableName());
-        }
-    }
-
-    @Override
-    public List<SchemaTableName> listViews(ConnectorSession session, Optional<String> schemaName)
-    {
-        // Filter on PRESTO_VIEW_COMMENT to distinguish from materialized views
-        return listSchemas(session, schemaName).stream()
-                .flatMap(schema ->
-                        metastore.getTablesWithParameter(schema, TABLE_COMMENT, PRESTO_VIEW_COMMENT).stream()
-                                .map(table -> new SchemaTableName(schema, table)))
-                .collect(toImmutableList());
-    }
-
-    @Override
-    public Map<SchemaTableName, ConnectorViewDefinition> getViews(ConnectorSession session, Optional<String> schemaName)
-    {
-        ImmutableMap.Builder<SchemaTableName, ConnectorViewDefinition> views = ImmutableMap.builder();
-        for (SchemaTableName name : listViews(session, schemaName)) {
-            try {
-                getView(session, name).ifPresent(view -> views.put(name, view));
-            }
-            catch (TrinoException e) {
-                if (e.getErrorCode().equals(TABLE_NOT_FOUND.toErrorCode())) {
-                    // Ignore view that was dropped during query execution (race condition)
-                }
-                else {
-                    throw e;
-                }
-            }
-        }
-        return views.build();
-    }
-
-    @Override
-    public Optional<ConnectorViewDefinition> getView(ConnectorSession session, SchemaTableName viewName)
-    {
-        if (isHiveSystemSchema(viewName.getSchemaName())) {
-            return Optional.empty();
-        }
-        return metastore.getTable(new HiveIdentity(session), viewName.getSchemaName(), viewName.getTableName())
-                .filter(table -> HiveMetadata.PRESTO_VIEW_COMMENT.equals(table.getParameters().get(TABLE_COMMENT))) // filter out materialized views
-                .filter(ViewReaderUtil::canDecodeView)
-                .map(view -> {
-                    if (!isPrestoView(view)) {
-                        throw new HiveViewNotSupportedException(viewName);
-                    }
-
-                    ConnectorViewDefinition definition = viewReader
-                            .decodeViewData(view.getViewOriginalText().get(), view, catalogName);
-                    // use owner from table metadata if it exists
-                    if (view.getOwner() != null && !definition.isRunAsInvoker()) {
-                        definition = new ConnectorViewDefinition(
-                                definition.getOriginalSql(),
-                                definition.getCatalog(),
-                                definition.getSchema(),
-                                definition.getColumns(),
-                                definition.getComment(),
-                                Optional.of(view.getOwner()),
-                                false);
-                    }
-                    return definition;
-                });
     }
 
     @Override
@@ -1062,7 +888,6 @@ public class IcebergMetadata
                 .put(PRESTO_QUERY_ID_NAME, session.getQueryId())
                 .put(STORAGE_TABLE, storageTableName)
                 .put(PRESTO_VIEW_FLAG, "true")
-                .put(TRINO_CREATED_BY, TRINO_CREATED_BY_VALUE)
                 .put(TABLE_COMMENT, ICEBERG_MATERIALIZED_VIEW_COMMENT)
                 .build();
 
@@ -1167,9 +992,9 @@ public class IcebergMetadata
 
         AppendFiles appendFiles = transaction.newFastAppend();
         for (CommitTaskData task : commitTasks) {
+            HdfsContext context = new HdfsContext(session);
             DataFiles.Builder builder = DataFiles.builder(icebergTable.spec())
-                    .withPath(task.getPath())
-                    .withFileSizeInBytes(task.getFileSizeInBytes())
+                    .withInputFile(new HdfsInputFile(new Path(task.getPath()), hdfsEnvironment, context))
                     .withFormat(table.getFileFormat())
                     .withMetrics(task.getMetrics().metrics());
 
@@ -1208,8 +1033,10 @@ public class IcebergMetadata
     @Override
     public List<SchemaTableName> listMaterializedViews(ConnectorSession session, Optional<String> schemaName)
     {
-        // Filter on ICEBERG_MATERIALIZED_VIEW_COMMENT is used to avoid listing hive views in case of a shared HMS and to distinguish from standard views
-        return listSchemas(session, schemaName).stream()
+        // Iceberg does not support VIEWs
+        // Filter on ICEBERG_MATERIALIZED_VIEW_COMMENT is used to avoid listing hive views in case of a shared HMS
+        return schemaName.map(Collections::singletonList)
+                .orElseGet(metastore::getAllDatabases).stream()
                 .flatMap(schema -> metastore.getTablesWithParameter(schema, TABLE_COMMENT, ICEBERG_MATERIALIZED_VIEW_COMMENT).stream()
                         .map(table -> new SchemaTableName(schema, table)))
                 .collect(toImmutableList());

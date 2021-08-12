@@ -77,23 +77,12 @@ Type mapping
 
 .. include:: jdbc-type-mapping.fragment
 
-.. _redshift-sql-support:
-
-SQL support
+Limitations
 -----------
 
-The connector provides read access and write access to data and metadata in
-Redshift. In addition to the :ref:`globally available
-<sql-globally-available>` and :ref:`read operation <sql-read-operations>`
-statements, the connector supports the following features:
+The following SQL statements are not yet supported:
 
-* :doc:`/sql/insert`
 * :doc:`/sql/delete`
-* :doc:`/sql/create-table`
-* :doc:`/sql/create-table-as`
-* :doc:`/sql/drop-table`
-* :doc:`/sql/create-schema`
-* :doc:`/sql/drop-schema`
-* :doc:`/sql/comment`
-
-.. include:: sql-delete-limitation.fragment
+* :doc:`/sql/grant`
+* :doc:`/sql/revoke`
+* :doc:`/sql/show-grants`

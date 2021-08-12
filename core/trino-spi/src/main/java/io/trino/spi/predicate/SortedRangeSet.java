@@ -779,7 +779,7 @@ public final class SortedRangeSet
         SortedRangeSet other = (SortedRangeSet) obj;
         return hashCode() == other.hashCode() && // compare hash codes because they are cached, so this is cheap and efficient
                 Objects.equals(this.type, other.type) &&
-                Arrays.equals(this.inclusive, other.inclusive) &&
+                Arrays.equals(inclusive, inclusive) &&
                 blocksEqual(this.sortedRanges, other.sortedRanges);
     }
 

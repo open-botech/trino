@@ -113,7 +113,7 @@ public class Server
         Bootstrap app = new Bootstrap(modules.build());
 
         try {
-            Injector injector = app.initialize();
+            Injector injector = app.strictConfig().initialize();
 
             log.info("Trino version: %s", injector.getInstance(NodeVersion.class).getVersion());
             logLocation(log, "Working directory", Paths.get("."));

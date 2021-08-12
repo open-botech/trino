@@ -16,7 +16,6 @@ package io.trino.plugin.iceberg;
 import io.airlift.json.JsonCodec;
 import io.trino.plugin.base.CatalogName;
 import io.trino.plugin.hive.HdfsEnvironment;
-import io.trino.plugin.hive.NodeVersion;
 import io.trino.plugin.hive.metastore.HiveMetastore;
 import io.trino.spi.type.TypeManager;
 
@@ -32,7 +31,6 @@ public class IcebergMetadataFactory
     private final TypeManager typeManager;
     private final JsonCodec<CommitTaskData> commitTaskCodec;
     private final HiveTableOperationsProvider tableOperationsProvider;
-    private final String trinoVersion;
 
     @Inject
     public IcebergMetadataFactory(
@@ -42,10 +40,9 @@ public class IcebergMetadataFactory
             HdfsEnvironment hdfsEnvironment,
             TypeManager typeManager,
             JsonCodec<CommitTaskData> commitTaskDataJsonCodec,
-            HiveTableOperationsProvider tableOperationsProvider,
-            NodeVersion nodeVersion)
+            HiveTableOperationsProvider tableOperationsProvider)
     {
-        this(catalogName, metastore, hdfsEnvironment, typeManager, commitTaskDataJsonCodec, tableOperationsProvider, nodeVersion);
+        this(catalogName, metastore, hdfsEnvironment, typeManager, commitTaskDataJsonCodec, tableOperationsProvider);
     }
 
     public IcebergMetadataFactory(
@@ -54,8 +51,7 @@ public class IcebergMetadataFactory
             HdfsEnvironment hdfsEnvironment,
             TypeManager typeManager,
             JsonCodec<CommitTaskData> commitTaskCodec,
-            HiveTableOperationsProvider tableOperationsProvider,
-            NodeVersion nodeVersion)
+            HiveTableOperationsProvider tableOperationsProvider)
     {
         this.catalogName = requireNonNull(catalogName, "catalogName is null");
         this.metastore = requireNonNull(metastore, "metastore is null");
@@ -63,11 +59,10 @@ public class IcebergMetadataFactory
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.commitTaskCodec = requireNonNull(commitTaskCodec, "commitTaskCodec is null");
         this.tableOperationsProvider = requireNonNull(tableOperationsProvider, "tableOperationsProvider is null");
-        this.trinoVersion = requireNonNull(nodeVersion, "nodeVersion is null").toString();
     }
 
     public IcebergMetadata create()
     {
-        return new IcebergMetadata(catalogName, metastore, hdfsEnvironment, typeManager, commitTaskCodec, tableOperationsProvider, trinoVersion);
+        return new IcebergMetadata(catalogName, metastore, hdfsEnvironment, typeManager, commitTaskCodec, tableOperationsProvider);
     }
 }

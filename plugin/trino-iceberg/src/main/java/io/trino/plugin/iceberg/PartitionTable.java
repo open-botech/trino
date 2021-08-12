@@ -47,19 +47,16 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static com.google.common.collect.ImmutableList.toImmutableList;
-import static io.airlift.slice.Slices.utf8Slice;
 import static io.trino.plugin.iceberg.IcebergUtil.getIdentityPartitions;
-import static io.trino.plugin.iceberg.IcebergUtil.primitiveFieldTypes;
-import static io.trino.plugin.iceberg.Partition.convertBounds;
 import static io.trino.plugin.iceberg.TypeConverter.toTrinoType;
 import static io.trino.plugin.iceberg.util.Timestamps.timestampTzFromMicros;
 import static io.trino.spi.type.BigintType.BIGINT;
@@ -86,7 +83,9 @@ public class PartitionTable
         this.typeManager = requireNonNull(typeManager, "typeManager is null");
         this.icebergTable = requireNonNull(icebergTable, "icebergTable is null");
         this.snapshotId = requireNonNull(snapshotId, "snapshotId is null");
-        this.idToTypeMapping = primitiveFieldTypes(icebergTable.schema());
+        this.idToTypeMapping = icebergTable.schema().columns().stream()
+                .filter(column -> column.type().isPrimitiveType())
+                .collect(Collectors.toMap(Types.NestedField::fieldId, (column) -> column.type().asPrimitiveType()));
 
         List<Types.NestedField> columns = icebergTable.schema().columns();
         List<PartitionField> partitionFields = icebergTable.spec().fields();
@@ -184,8 +183,8 @@ public class PartitionTable
                             partitionStruct,
                             dataFile.recordCount(),
                             dataFile.fileSizeInBytes(),
-                            convertBounds(idToTypeMapping, dataFile.lowerBounds()),
-                            convertBounds(idToTypeMapping, dataFile.upperBounds()),
+                            toMap(dataFile.lowerBounds()),
+                            toMap(dataFile.upperBounds()),
                             dataFile.nullValueCounts(),
                             dataFile.columnSizes());
                     partitions.put(partitionWrapper, partition);
@@ -196,8 +195,8 @@ public class PartitionTable
                 partition.incrementFileCount();
                 partition.incrementRecordCount(dataFile.recordCount());
                 partition.incrementSize(dataFile.fileSizeInBytes());
-                partition.updateMin(convertBounds(idToTypeMapping, dataFile.lowerBounds()), dataFile.nullValueCounts(), dataFile.recordCount());
-                partition.updateMax(convertBounds(idToTypeMapping, dataFile.upperBounds()), dataFile.nullValueCounts(), dataFile.recordCount());
+                partition.updateMin(toMap(dataFile.lowerBounds()), dataFile.nullValueCounts(), dataFile.recordCount());
+                partition.updateMax(toMap(dataFile.upperBounds()), dataFile.nullValueCounts(), dataFile.recordCount());
                 partition.updateNullCount(dataFile.nullValueCounts());
             }
 
@@ -275,24 +274,22 @@ public class PartitionTable
         return columnMetricType.getObject(rowBlockBuilder, 0);
     }
 
-    /**
-     * Convert value from Iceberg representation to Trino representation.
-     */
+    private Map<Integer, Object> toMap(Map<Integer, ByteBuffer> idToMetricMap)
+    {
+        return Partition.toMap(idToTypeMapping, idToMetricMap);
+    }
+
     public static Object convert(Object value, Type type)
     {
         if (value == null) {
             return null;
         }
         if (type instanceof Types.StringType) {
-            // Partition values are passed as String, but min/max values are passed as a CharBuffer
-            if (value instanceof CharBuffer) {
-                value = new String(((CharBuffer) value).array());
-            }
-            return utf8Slice(((String) value));
+            return value.toString();
         }
         if (type instanceof Types.BinaryType) {
             // TODO the client sees the bytearray's tostring ouput instead of seeing actual bytes, needs to be fixed.
-            return ((ByteBuffer) value).array().clone();
+            return ((ByteBuffer) value).array();
         }
         if (type instanceof Types.TimestampType) {
             long epochMicros = (long) value;
@@ -302,13 +299,10 @@ public class PartitionTable
             return epochMicros;
         }
         if (type instanceof Types.TimeType) {
-            return Math.multiplyExact((Long) value, PICOSECONDS_PER_MICROSECOND);
+            return ((Long) value) * PICOSECONDS_PER_MICROSECOND;
         }
         if (type instanceof Types.FloatType) {
             return Float.floatToIntBits((Float) value);
-        }
-        if (type instanceof Types.IntegerType || type instanceof Types.DateType) {
-            return ((Integer) value).longValue();
         }
         if (type instanceof Types.DecimalType) {
             Types.DecimalType icebergDecimalType = (Types.DecimalType) type;
@@ -318,7 +312,6 @@ public class PartitionTable
             }
             return Decimals.encodeScaledValue((BigDecimal) value, trinoDecimalType.getScale());
         }
-        // TODO implement explicit conversion for all supported types
         return value;
     }
 }

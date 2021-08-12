@@ -792,13 +792,6 @@ public abstract class DefaultTraversalVisitor<C>
     }
 
     @Override
-    protected Void visitExplainAnalyze(ExplainAnalyze node, C context)
-    {
-        process(node.getStatement(), context);
-        return null;
-    }
-
-    @Override
     protected Void visitShowStats(ShowStats node, C context)
     {
         process(node.getRelation(), context);

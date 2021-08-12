@@ -94,6 +94,7 @@ public class TestProxyServer
                 new ProxyModule());
 
         Injector injector = app
+                .strictConfig()
                 .doNotInitializeLogging()
                 .setRequiredConfigurationProperty("proxy.uri", server.getBaseUrl().toString())
                 .setRequiredConfigurationProperty("proxy.shared-secret-file", sharedSecretFile.toString())

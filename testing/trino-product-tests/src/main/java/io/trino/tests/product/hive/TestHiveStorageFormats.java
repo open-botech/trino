@@ -215,7 +215,6 @@ public class TestHiveStorageFormats
         return new StorageFormat[] {
                 storageFormat("ORC", ImmutableMap.of("hive.orc_optimized_writer_validate", "true")),
                 storageFormat("PARQUET"),
-                storageFormat("PARQUET", ImmutableMap.of("hive.experimental_parquet_optimized_writer_enabled", "true")),
                 storageFormat("RCBINARY", ImmutableMap.of("hive.rcfile_optimized_writer_validate", "true")),
                 storageFormat("RCTEXT", ImmutableMap.of("hive.rcfile_optimized_writer_validate", "true")),
                 storageFormat("SEQUENCEFILE"),
@@ -239,10 +238,8 @@ public class TestHiveStorageFormats
     public static Iterator<StorageFormat> storageFormatsWithNanosecondPrecision()
     {
         return Stream.of(storageFormats())
-                // nanoseconds are not supported with Avro
+                // everything but Avro supports nanoseconds
                 .filter(format -> !"AVRO".equals(format.getName()))
-                // TODO (https://github.com/trinodb/trino/issues/5357) Implement variable precision timestamp handling for optimized Parquet writer
-                .filter(format -> !("PARQUET".equals(format.getName()) && "true".equals(format.getSessionProperties().get("hive.experimental_parquet_optimized_writer_enabled"))))
                 .iterator();
     }
 
@@ -292,7 +289,6 @@ public class TestHiveStorageFormats
     }
 
     @Test(dataProvider = "storageFormats", groups = STORAGE_FORMATS)
-    @Flaky(issue = ERROR_COMMITTING_WRITE_TO_HIVE_ISSUE, match = ERROR_COMMITTING_WRITE_TO_HIVE_MATCH)
     public void testCreateTableAs(StorageFormat storageFormat)
     {
         // only admin user is allowed to change session properties

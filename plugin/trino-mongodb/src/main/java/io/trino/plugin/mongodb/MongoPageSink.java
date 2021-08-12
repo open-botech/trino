@@ -42,7 +42,6 @@ import io.trino.spi.type.Type;
 import io.trino.spi.type.TypeSignatureParameter;
 import io.trino.spi.type.VarbinaryType;
 import io.trino.spi.type.VarcharType;
-import org.bson.BsonInvalidOperationException;
 import org.bson.Document;
 import org.bson.types.Binary;
 import org.bson.types.ObjectId;
@@ -59,7 +58,6 @@ import java.util.concurrent.TimeUnit;
 
 import static io.trino.plugin.mongodb.ObjectIdType.OBJECT_ID;
 import static io.trino.plugin.mongodb.TypeUtils.isArrayType;
-import static io.trino.plugin.mongodb.TypeUtils.isJsonType;
 import static io.trino.plugin.mongodb.TypeUtils.isMapType;
 import static io.trino.plugin.mongodb.TypeUtils.isRowType;
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
@@ -178,15 +176,6 @@ public class MongoPageSink
         }
         if (type instanceof DecimalType) {
             return readBigDecimal((DecimalType) type, block, position);
-        }
-        if (isJsonType(type)) {
-            String json = type.getSlice(block, position).toStringUtf8();
-            try {
-                return Document.parse(json);
-            }
-            catch (BsonInvalidOperationException e) {
-                throw new TrinoException(NOT_SUPPORTED, "Can't convert json to MongoDB Document: " + json, e);
-            }
         }
         if (isArrayType(type)) {
             Type elementType = type.getTypeParameters().get(0);

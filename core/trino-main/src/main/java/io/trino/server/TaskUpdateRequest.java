@@ -19,9 +19,7 @@ import com.google.common.collect.ImmutableList;
 import io.trino.SessionRepresentation;
 import io.trino.execution.TaskSource;
 import io.trino.execution.buffer.OutputBuffers;
-import io.trino.spi.predicate.Domain;
 import io.trino.sql.planner.PlanFragment;
-import io.trino.sql.planner.plan.DynamicFilterId;
 
 import java.util.List;
 import java.util.Map;
@@ -40,7 +38,6 @@ public class TaskUpdateRequest
     private final List<TaskSource> sources;
     private final OutputBuffers outputIds;
     private final OptionalInt totalPartitions;
-    private final Map<DynamicFilterId, Domain> dynamicFilterDomains;
 
     @JsonCreator
     public TaskUpdateRequest(
@@ -49,8 +46,7 @@ public class TaskUpdateRequest
             @JsonProperty("fragment") Optional<PlanFragment> fragment,
             @JsonProperty("sources") List<TaskSource> sources,
             @JsonProperty("outputIds") OutputBuffers outputIds,
-            @JsonProperty("totalPartitions") OptionalInt totalPartitions,
-            @JsonProperty("dynamicFilterDomains") Map<DynamicFilterId, Domain> dynamicFilterDomains)
+            @JsonProperty("totalPartitions") OptionalInt totalPartitions)
     {
         requireNonNull(session, "session is null");
         requireNonNull(extraCredentials, "extraCredentials is null");
@@ -58,7 +54,6 @@ public class TaskUpdateRequest
         requireNonNull(sources, "sources is null");
         requireNonNull(outputIds, "outputIds is null");
         requireNonNull(totalPartitions, "totalPartitions is null");
-        requireNonNull(dynamicFilterDomains, "dynamicFilterDomains is null");
 
         this.session = session;
         this.extraCredentials = extraCredentials;
@@ -66,7 +61,6 @@ public class TaskUpdateRequest
         this.sources = ImmutableList.copyOf(sources);
         this.outputIds = outputIds;
         this.totalPartitions = totalPartitions;
-        this.dynamicFilterDomains = dynamicFilterDomains;
     }
 
     @JsonProperty
@@ -105,12 +99,6 @@ public class TaskUpdateRequest
         return totalPartitions;
     }
 
-    @JsonProperty
-    public Map<DynamicFilterId, Domain> getDynamicFilterDomains()
-    {
-        return dynamicFilterDomains;
-    }
-
     @Override
     public String toString()
     {
@@ -121,7 +109,6 @@ public class TaskUpdateRequest
                 .add("sources", sources)
                 .add("outputIds", outputIds)
                 .add("totalPartitions", totalPartitions)
-                .add("dynamicFilterDomains", dynamicFilterDomains)
                 .toString();
     }
 }

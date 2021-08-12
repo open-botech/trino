@@ -34,6 +34,7 @@ public class HdfsOutputFile
     private final Path path;
     private final HdfsEnvironment environment;
     private final HdfsContext context;
+    private final String user;
 
     public HdfsOutputFile(Path path, HdfsEnvironment environment, HdfsContext context)
     {
@@ -46,18 +47,19 @@ public class HdfsOutputFile
         catch (IOException e) {
             throw new TrinoException(ICEBERG_FILESYSTEM_ERROR, "Failed to create output file: " + path.toString(), e);
         }
+        this.user = context.getIdentity().getUser();
     }
 
     @Override
     public PositionOutputStream create()
     {
-        return environment.doAs(context.getIdentity(), delegate::create);
+        return environment.doAs(user, delegate::create);
     }
 
     @Override
     public PositionOutputStream createOrOverwrite()
     {
-        return environment.doAs(context.getIdentity(), delegate::createOrOverwrite);
+        return environment.doAs(user, delegate::createOrOverwrite);
     }
 
     @Override

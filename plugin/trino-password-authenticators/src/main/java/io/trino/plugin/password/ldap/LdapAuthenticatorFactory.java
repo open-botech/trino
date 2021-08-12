@@ -43,6 +43,7 @@ public class LdapAuthenticatorFactory
                 });
 
         Injector injector = app
+                .strictConfig()
                 .doNotInitializeLogging()
                 .setRequiredConfigurationProperties(config)
                 .initialize();

@@ -56,7 +56,7 @@ public class BigQueryConnectorFactory
                     binder.bind(NodeManager.class).toInstance(context.getNodeManager());
                 });
 
-        Injector injector = app
+        Injector injector = app.strictConfig()
                 .doNotInitializeLogging()
                 .setRequiredConfigurationProperties(config)
                 .initialize();

@@ -54,7 +54,6 @@ public class HiveSplit
     private final Optional<BucketValidation> bucketValidation;
     private final boolean s3SelectPushdownEnabled;
     private final Optional<AcidInfo> acidInfo;
-    private final long splitNumber;
 
     @JsonCreator
     public HiveSplit(
@@ -76,8 +75,7 @@ public class HiveSplit
             @JsonProperty("bucketConversion") Optional<BucketConversion> bucketConversion,
             @JsonProperty("bucketValidation") Optional<BucketValidation> bucketValidation,
             @JsonProperty("s3SelectPushdownEnabled") boolean s3SelectPushdownEnabled,
-            @JsonProperty("acidInfo") Optional<AcidInfo> acidInfo,
-            @JsonProperty("splitNumber") long splitNumber)
+            @JsonProperty("acidInfo") Optional<AcidInfo> acidInfo)
     {
         checkArgument(start >= 0, "start must be positive");
         checkArgument(length >= 0, "length must be positive");
@@ -114,7 +112,6 @@ public class HiveSplit
         this.bucketValidation = bucketValidation;
         this.s3SelectPushdownEnabled = s3SelectPushdownEnabled;
         this.acidInfo = acidInfo;
-        this.splitNumber = splitNumber;
     }
 
     @JsonProperty
@@ -238,12 +235,6 @@ public class HiveSplit
         return acidInfo;
     }
 
-    @JsonProperty
-    public long getSplitNumber()
-    {
-        return splitNumber;
-    }
-
     @Override
     public Object getInfo()
     {
@@ -259,7 +250,6 @@ public class HiveSplit
                 .put("partitionName", partitionName)
                 .put("deserializerClassName", getDeserializerClassName(schema))
                 .put("s3SelectPushdownEnabled", s3SelectPushdownEnabled)
-                .put("splitNumber", splitNumber)
                 .build();
     }
 

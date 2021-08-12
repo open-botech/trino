@@ -29,7 +29,6 @@ import io.trino.plugin.hive.HdfsEnvironment;
 import io.trino.spi.Page;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorPageSource;
-import io.trino.spi.security.ConnectorIdentity;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileSystem;
@@ -78,15 +77,15 @@ public class OrcDeleteDeltaPageSource
             Path path,
             long fileSize,
             OrcReaderOptions options,
-            ConnectorIdentity identity,
+            String sessionUser,
             Configuration configuration,
             HdfsEnvironment hdfsEnvironment,
             FileFormatDataSourceStats stats)
     {
         OrcDataSource orcDataSource;
         try {
-            FileSystem fileSystem = hdfsEnvironment.getFileSystem(identity, path, configuration);
-            FSDataInputStream inputStream = hdfsEnvironment.doAs(identity, () -> fileSystem.open(path));
+            FileSystem fileSystem = hdfsEnvironment.getFileSystem(sessionUser, path, configuration);
+            FSDataInputStream inputStream = hdfsEnvironment.doAs(sessionUser, () -> fileSystem.open(path));
             orcDataSource = new HdfsOrcDataSource(
                     new OrcDataSourceId(path.toString()),
                     fileSize,

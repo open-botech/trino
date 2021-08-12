@@ -50,6 +50,7 @@ public class AccumuloConnectorFactory
                 new AccumuloModule());
 
         Injector injector = app
+                .strictConfig()
                 .doNotInitializeLogging()
                 .setRequiredConfigurationProperties(config)
                 .initialize();

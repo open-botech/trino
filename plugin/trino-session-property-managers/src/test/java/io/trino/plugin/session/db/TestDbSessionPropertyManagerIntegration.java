@@ -226,6 +226,7 @@ public class TestDbSessionPropertyManagerIntegration
                     new TestingDbSessionPropertyManagerModule());
 
             Injector injector = app
+                    .strictConfig()
                     .doNotInitializeLogging()
                     .setRequiredConfigurationProperties(config)
                     .quiet()

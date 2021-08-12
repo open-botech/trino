@@ -77,7 +77,6 @@ import static io.airlift.jaxrs.AsyncResponseHandler.bindAsyncResponse;
 import static io.trino.execution.QueryState.FAILED;
 import static io.trino.execution.QueryState.QUEUED;
 import static io.trino.server.HttpRequestSessionContext.AUTHENTICATED_IDENTITY;
-import static io.trino.server.protocol.QueryInfoUrlFactory.getQueryInfoUri;
 import static io.trino.server.protocol.Slug.Context.EXECUTING_QUERY;
 import static io.trino.server.protocol.Slug.Context.QUEUED_QUERY;
 import static io.trino.server.security.ResourceSecurity.AccessType.AUTHENTICATED_USER;
@@ -267,6 +266,15 @@ public class QueuedStatementResource
         return builder.build();
     }
 
+    private static URI getQueryHtmlUri(QueryId queryId, UriInfo uriInfo, Optional<URI> queryInfoUrl)
+    {
+        return queryInfoUrl.orElseGet(() ->
+                uriInfo.getRequestUriBuilder()
+                        .replacePath("ui/query.html")
+                        .replaceQuery(queryId.toString())
+                        .build());
+    }
+
     private static URI getQueuedUri(QueryId queryId, Slug slug, long token, UriInfo uriInfo)
     {
         return uriInfo.getBaseUriBuilder()
@@ -290,7 +298,7 @@ public class QueuedStatementResource
         QueryState state = queryError.map(error -> FAILED).orElse(QUEUED);
         return new QueryResults(
                 queryId.toString(),
-                getQueryInfoUri(queryInfoUrl, queryId, uriInfo),
+                getQueryHtmlUri(queryId, uriInfo, queryInfoUrl),
                 null,
                 nextUri,
                 null,

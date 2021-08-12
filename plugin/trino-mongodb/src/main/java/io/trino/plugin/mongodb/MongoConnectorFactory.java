@@ -61,7 +61,7 @@ public class MongoConnectorFactory
                 new MongoClientModule(),
                 binder -> binder.bind(TypeManager.class).toInstance(context.getTypeManager()));
 
-        Injector injector = app.doNotInitializeLogging()
+        Injector injector = app.strictConfig().doNotInitializeLogging()
                 .setRequiredConfigurationProperties(config)
                 .initialize();
 

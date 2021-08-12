@@ -6,9 +6,8 @@ This chapter describes the SQL functions and operators supported by Trino. They
 allow you to implement complex functionality and behavior of the SQL executed by
 Trino operating on the underlying data sources.
 
-If you are looking for a specific function or operator, see the :doc:`full
-alphabetical list</functions/list>` or the :doc:`full list by
-topic</functions/list-by-topic>`.
+If you are looking for a specific function or operator,
+see the :doc:`full list</functions/list>`.
 
 Also see the :doc:`SQL data types</language>`
 and the :doc:`SQL statement and syntax reference</sql>`.
@@ -45,4 +44,3 @@ and the :doc:`SQL statement and syntax reference</sql>`.
     UUID                <functions/uuid>
     Window              <functions/window>
     functions/list
-    functions/list-by-topic

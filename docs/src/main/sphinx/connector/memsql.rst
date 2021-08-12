@@ -85,22 +85,14 @@ The connector supports pushdown for a number of operations:
 * :ref:`limit-pushdown`
 * :ref:`topn-pushdown`
 
-.. _singlestore-sql-support:
-
-SQL support
+Limitations
 -----------
 
-The connector provides read access and write access to data and metadata in
-a SingleStore database.  In addition to the :ref:`globally available
-<sql-globally-available>` and :ref:`read operation <sql-read-operations>`
-statements, the connector supports the following features:
+The following SQL statements are not yet supported:
 
-* :doc:`/sql/insert`
 * :doc:`/sql/delete`
-* :doc:`/sql/create-table`
-* :doc:`/sql/create-table-as`
-* :doc:`/sql/drop-table`
-* :doc:`/sql/create-schema`
-* :doc:`/sql/drop-schema`
-
-.. include:: sql-delete-limitation.fragment
+* :doc:`/sql/grant`
+* :doc:`/sql/revoke`
+* :doc:`/sql/show-grants`
+* :doc:`/sql/show-roles`
+* :doc:`/sql/show-role-grants`

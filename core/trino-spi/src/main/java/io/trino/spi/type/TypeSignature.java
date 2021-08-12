@@ -22,12 +22,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 import static io.trino.spi.type.StandardTypes.TIME_WITH_TIME_ZONE;
 import static io.trino.spi.type.TypeSignatureParameter.typeParameter;
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
-import static java.util.stream.Collectors.toUnmodifiableList;
 
 @Immutable
 public final class TypeSignature
@@ -198,9 +198,9 @@ public final class TypeSignature
     {
         return new TypeSignature(
                 name,
-                Arrays.stream(parameters)
+                Arrays.asList(parameters).stream()
                         .map(TypeSignatureParameter::typeParameter)
-                        .collect(toUnmodifiableList()));
+                        .collect(Collectors.toList()));
     }
 
     public static TypeSignature functionType(TypeSignature first, TypeSignature... rest)
@@ -208,7 +208,7 @@ public final class TypeSignature
         List<TypeSignatureParameter> parameters = new ArrayList<>();
         parameters.add(typeParameter(first));
 
-        Arrays.stream(rest)
+        Arrays.asList(rest).stream()
                 .map(TypeSignatureParameter::typeParameter)
                 .forEach(parameters::add);
 

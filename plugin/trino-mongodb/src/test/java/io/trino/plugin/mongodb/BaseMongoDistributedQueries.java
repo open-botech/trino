@@ -26,12 +26,6 @@ public abstract class BaseMongoDistributedQueries
         extends AbstractTestDistributedQueries
 {
     @Override
-    protected boolean supportsCreateSchema()
-    {
-        return false;
-    }
-
-    @Override
     protected boolean supportsDelete()
     {
         return false;
@@ -56,9 +50,15 @@ public abstract class BaseMongoDistributedQueries
     }
 
     @Override
-    protected boolean supportsRenameTable()
+    public void testCreateSchema()
     {
-        return false;
+        // the connector does not support creating schemas
+    }
+
+    @Override
+    public void testRenameTable()
+    {
+        // the connector does not support renaming tables
     }
 
     @Override

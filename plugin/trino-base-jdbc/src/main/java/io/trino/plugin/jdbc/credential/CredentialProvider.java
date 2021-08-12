@@ -13,13 +13,13 @@
  */
 package io.trino.plugin.jdbc.credential;
 
-import io.trino.spi.security.ConnectorIdentity;
+import io.trino.plugin.jdbc.JdbcIdentity;
 
 import java.util.Optional;
 
 public interface CredentialProvider
 {
-    Optional<String> getConnectionUser(Optional<ConnectorIdentity> jdbcIdentity);
+    Optional<String> getConnectionUser(Optional<JdbcIdentity> jdbcIdentity);
 
-    Optional<String> getConnectionPassword(Optional<ConnectorIdentity> jdbcIdentity);
+    Optional<String> getConnectionPassword(Optional<JdbcIdentity> jdbcIdentity);
 }

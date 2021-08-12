@@ -16,7 +16,6 @@ package io.trino.plugin.iceberg;
 import io.trino.plugin.hive.HdfsEnvironment;
 import io.trino.plugin.hive.HdfsEnvironment.HdfsContext;
 import io.trino.spi.TrinoException;
-import io.trino.spi.security.ConnectorIdentity;
 import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.hadoop.HadoopInputFile;
 import org.apache.iceberg.io.InputFile;
@@ -33,7 +32,7 @@ public class HdfsInputFile
 {
     private final InputFile delegate;
     private final HdfsEnvironment environment;
-    private final ConnectorIdentity identity;
+    private final String user;
 
     public HdfsInputFile(Path path, HdfsEnvironment environment, HdfsContext context)
     {
@@ -46,20 +45,19 @@ public class HdfsInputFile
         catch (IOException e) {
             throw new TrinoException(ICEBERG_FILESYSTEM_ERROR, "Failed to create input file: " + path, e);
         }
-        this.identity = context.getIdentity();
+        this.user = context.getIdentity().getUser();
     }
 
     @Override
     public long getLength()
     {
-        return environment.doAs(identity, delegate::getLength);
+        return environment.doAs(user, delegate::getLength);
     }
 
     @Override
     public SeekableInputStream newStream()
     {
-        // Hack: this wrapping is required to circumvent https://github.com/trinodb/trino/issues/5201
-        return new HdfsInputStream(environment.doAs(identity, delegate::newStream));
+        return environment.doAs(user, delegate::newStream);
     }
 
     @Override
@@ -71,7 +69,7 @@ public class HdfsInputFile
     @Override
     public boolean exists()
     {
-        return environment.doAs(identity, delegate::exists);
+        return environment.doAs(user, delegate::exists);
     }
 
     @Override
@@ -79,46 +77,7 @@ public class HdfsInputFile
     {
         return toStringHelper(this)
                 .add("delegate", delegate)
-                .add("identity", identity)
+                .add("user", user)
                 .toString();
-    }
-
-    private static class HdfsInputStream
-            extends SeekableInputStream
-    {
-        private final SeekableInputStream delegate;
-
-        public HdfsInputStream(SeekableInputStream delegate)
-        {
-            this.delegate = requireNonNull(delegate, "delegate is null");
-        }
-
-        @Override
-        public int read()
-                throws IOException
-        {
-            return delegate.read();
-        }
-
-        @Override
-        public long getPos()
-                throws IOException
-        {
-            return delegate.getPos();
-        }
-
-        @Override
-        public void seek(long newPos)
-                throws IOException
-        {
-            delegate.seek(newPos);
-        }
-
-        @Override
-        public void close()
-                throws IOException
-        {
-            delegate.close();
-        }
     }
 }

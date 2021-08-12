@@ -69,6 +69,7 @@ public class TestHttpBackupStore
                 override(new HttpBackupModule()).with(new TestingModule()));
 
         Injector injector = app
+                .strictConfig()
                 .setRequiredConfigurationProperties(properties)
                 .doNotInitializeLogging()
                 .quiet()

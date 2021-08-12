@@ -96,7 +96,6 @@ public class TestIcebergMetadataListing
         assertQuerySucceeds("CREATE MATERIALIZED VIEW iceberg.test_schema.iceberg_materialized_view AS " +
                 "SELECT * FROM iceberg.test_schema.iceberg_table1");
         storageTable = getStorageTable("iceberg", "test_schema", "iceberg_materialized_view");
-        assertQuerySucceeds("CREATE VIEW iceberg.test_schema.iceberg_view AS SELECT * FROM iceberg.test_schema.iceberg_table1");
 
         assertQuerySucceeds("CREATE TABLE hive.test_schema.hive_table (_double DOUBLE)");
         assertQuerySucceeds("CREATE VIEW hive.test_schema.hive_view AS SELECT * FROM hive.test_schema.hive_table");
@@ -107,7 +106,6 @@ public class TestIcebergMetadataListing
     {
         assertQuerySucceeds("DROP TABLE IF EXISTS hive.test_schema.hive_table");
         assertQuerySucceeds("DROP VIEW IF EXISTS hive.test_schema.hive_view");
-        assertQuerySucceeds("DROP VIEW IF EXISTS iceberg.test_schema.iceberg_view");
         assertQuerySucceeds("DROP MATERIALIZED VIEW IF EXISTS iceberg.test_schema.iceberg_materialized_view");
         assertQuerySucceeds("DROP TABLE IF EXISTS iceberg.test_schema.iceberg_table2");
         assertQuerySucceeds("DROP TABLE IF EXISTS iceberg.test_schema.iceberg_table1");
@@ -123,7 +121,6 @@ public class TestIcebergMetadataListing
                         "iceberg_table2",
                         "iceberg_materialized_view",
                         storageTable.getTableName(),
-                        "iceberg_view",
                         "hive_table",
                         "hive_view");
 
@@ -133,9 +130,7 @@ public class TestIcebergMetadataListing
                         "'iceberg_table1', " +
                         "'iceberg_table2', " +
                         "'iceberg_materialized_view', " +
-                        "'" + storageTable.getTableName() + "', " +
-                        "'iceberg_view', " +
-                        "'hive_view'");
+                        "'" + storageTable.getTableName() + "'");
     }
 
     @Test
@@ -151,10 +146,7 @@ public class TestIcebergMetadataListing
                         "('iceberg_materialized_view', '_string'), " +
                         "('iceberg_materialized_view', '_integer'), " +
                         "('" + storageTable.getTableName() + "', '_string'), " +
-                        "('" + storageTable.getTableName() + "', '_integer'), " +
-                        "('iceberg_view', '_string'), " +
-                        "('iceberg_view', '_integer'), " +
-                        "('hive_view', '_double')");
+                        "('" + storageTable.getTableName() + "', '_integer')");
     }
 
     @Test

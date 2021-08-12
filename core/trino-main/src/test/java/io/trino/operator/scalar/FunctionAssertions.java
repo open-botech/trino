@@ -107,7 +107,7 @@ import static io.trino.block.BlockAssertions.createRowBlock;
 import static io.trino.block.BlockAssertions.createShortDecimalsBlock;
 import static io.trino.block.BlockAssertions.createSlicesBlock;
 import static io.trino.block.BlockAssertions.createStringsBlock;
-import static io.trino.block.BlockAssertions.createTimestampsWithTimeZoneMillisBlock;
+import static io.trino.block.BlockAssertions.createTimestampsWithTimeZoneBlock;
 import static io.trino.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.trino.spi.StandardErrorCode.INVALID_CAST_ARGUMENT;
 import static io.trino.spi.StandardErrorCode.INVALID_FUNCTION_ARGUMENT;
@@ -119,7 +119,6 @@ import static io.trino.spi.type.DecimalType.createDecimalType;
 import static io.trino.spi.type.Decimals.encodeScaledValue;
 import static io.trino.spi.type.DoubleType.DOUBLE;
 import static io.trino.spi.type.IntegerType.INTEGER;
-import static io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_TZ_MILLIS;
 import static io.trino.spi.type.TimestampWithTimeZoneType.TIMESTAMP_WITH_TIME_ZONE;
 import static io.trino.spi.type.VarbinaryType.VARBINARY;
 import static io.trino.spi.type.VarcharType.VARCHAR;
@@ -162,7 +161,7 @@ public final class FunctionAssertions
             createLongsBlock(new DateTime(2001, 8, 22, 3, 4, 5, 321, DateTimeZone.UTC).getMillis()),
             createStringsBlock("%el%"),
             createStringsBlock((String) null),
-            createTimestampsWithTimeZoneMillisBlock(packDateTimeWithZone(new DateTime(1970, 1, 1, 0, 1, 0, 999, DateTimeZone.UTC).getMillis(), TimeZoneKey.getTimeZoneKey("Z"))),
+            createTimestampsWithTimeZoneBlock(packDateTimeWithZone(new DateTime(1970, 1, 1, 0, 1, 0, 999, DateTimeZone.UTC).getMillis(), TimeZoneKey.getTimeZoneKey("Z"))),
             createSlicesBlock(Slices.wrappedBuffer((byte) 0xab)),
             createIntsBlock(1234),
             TEST_ROW_DATA,
@@ -179,7 +178,7 @@ public final class FunctionAssertions
             .put(new Symbol("bound_timestamp"), BIGINT)
             .put(new Symbol("bound_pattern"), VARCHAR)
             .put(new Symbol("bound_null_string"), VARCHAR)
-            .put(new Symbol("bound_timestamp_with_timezone"), TIMESTAMP_TZ_MILLIS)
+            .put(new Symbol("bound_timestamp_with_timezone"), TIMESTAMP_WITH_TIME_ZONE)
             .put(new Symbol("bound_binary_literal"), VARBINARY)
             .put(new Symbol("bound_integer"), INTEGER)
             .put(new Symbol("bound_row"), TEST_ROW_TYPE)
@@ -377,7 +376,7 @@ public final class FunctionAssertions
                     newSimpleAggregatedMemoryContext().newLocalMemoryContext(PageProcessor.class.getSimpleName()),
                     SOURCE_PAGE);
             // consume the iterator
-            Iterators.getOnlyElement(output);
+            Optional<Page> ignored = Iterators.getOnlyElement(output);
 
             long retainedSize = processor.getProjections().stream()
                     .mapToLong(this::getRetainedSizeOfCachedInstance)
@@ -427,25 +426,27 @@ public final class FunctionAssertions
             if (type == int[].class) {
                 return sizeOf((int[]) object);
             }
-            if (type == boolean[].class) {
+            else if (type == boolean[].class) {
                 return sizeOf((boolean[]) object);
             }
-            if (type == byte[].class) {
+            else if (type == byte[].class) {
                 return sizeOf((byte[]) object);
             }
-            if (type == long[].class) {
+            else if (type == long[].class) {
                 return sizeOf((long[]) object);
             }
-            if (type == short[].class) {
+            else if (type == short[].class) {
                 return sizeOf((short[]) object);
             }
-            if (type == Block[].class) {
+            else if (type == Block[].class) {
                 Object[] objects = (Object[]) object;
                 return Arrays.stream(objects)
                         .mapToLong(this::getRetainedSizeOf)
                         .sum();
             }
-            throw new IllegalArgumentException(format("Unknown type encountered: %s", type));
+            else {
+                throw new IllegalArgumentException(format("Unknown type encountered: %s", type));
+            }
         }
 
         long retainedSize = ClassLayout.parseClass(type).instanceSize();

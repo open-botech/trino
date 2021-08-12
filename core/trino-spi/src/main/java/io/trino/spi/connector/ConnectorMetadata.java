@@ -45,7 +45,7 @@ import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 import static java.lang.String.format;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
-import static java.util.stream.Collectors.toUnmodifiableList;
+import static java.util.stream.Collectors.toList;
 
 public interface ConnectorMetadata
 {
@@ -207,7 +207,7 @@ public interface ConnectorMetadata
     }
 
     /**
-     * List table, view and materialized view names, possibly filtered by schema. An empty list is returned if none match.
+     * List table and view names, possibly filtered by schema. An empty list is returned if none match.
      */
     default List<SchemaTableName> listTables(ConnectorSession session, Optional<String> schemaName)
     {
@@ -393,7 +393,7 @@ public interface ConnectorMetadata
                             .collect(Collectors.toMap(Map.Entry::getValue, Map.Entry::getKey));
                     List<String> partitionColumns = partitioning.getPartitioningColumns().stream()
                             .map(columnNamesByHandle::get)
-                            .collect(toUnmodifiableList());
+                            .collect(toList());
 
                     return new ConnectorNewTableLayout(partitioning.getPartitioningHandle(), partitionColumns);
                 });
@@ -662,7 +662,7 @@ public interface ConnectorMetadata
      */
     default Map<String, Object> getSchemaProperties(ConnectorSession session, CatalogSchemaName schemaName)
     {
-        return Map.of();
+        throw new TrinoException(NOT_SUPPORTED, "This connector does not support schema properties");
     }
 
     /**
@@ -670,7 +670,7 @@ public interface ConnectorMetadata
      */
     default Optional<TrinoPrincipal> getSchemaOwner(ConnectorSession session, CatalogSchemaName schemaName)
     {
-        return Optional.empty();
+        throw new TrinoException(NOT_SUPPORTED, "This connector does not support schema ownership");
     }
 
     /**

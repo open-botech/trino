@@ -22,11 +22,9 @@ import io.trino.testing.DistributedQueryRunner;
 import io.trino.tpch.TpchTable;
 import org.apache.iceberg.FileFormat;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static io.trino.plugin.tpch.TpchMetadata.TINY_SCHEMA_NAME;
 import static io.trino.testing.QueryAssertions.copyTpchTables;
@@ -63,17 +61,6 @@ public final class IcebergQueryRunner
     public static DistributedQueryRunner createIcebergQueryRunner(Map<String, String> extraProperties, FileFormat format, List<TpchTable<?>> tables)
             throws Exception
     {
-        return createIcebergQueryRunner(extraProperties, format, tables, Optional.empty());
-    }
-
-    public static DistributedQueryRunner createIcebergQueryRunner(
-            Map<String, String> extraProperties,
-            FileFormat format,
-            List<TpchTable<?>> tables,
-            Optional<File> metastoreDirectory)
-            throws Exception
-
-    {
         Session session = testSessionBuilder()
                 .setCatalog(ICEBERG_CATALOG)
                 .setSchema("tpch")
@@ -86,7 +73,7 @@ public final class IcebergQueryRunner
         queryRunner.installPlugin(new TpchPlugin());
         queryRunner.createCatalog("tpch", "tpch");
 
-        Path dataDir = metastoreDirectory.map(File::toPath).orElseGet(() -> queryRunner.getCoordinator().getBaseDataDir().resolve("iceberg_data"));
+        Path dataDir = queryRunner.getCoordinator().getBaseDataDir().resolve("iceberg_data");
 
         queryRunner.installPlugin(new IcebergPlugin());
         Map<String, String> icebergProperties = ImmutableMap.<String, String>builder()

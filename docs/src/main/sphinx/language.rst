@@ -20,6 +20,5 @@ Trino also provides :doc:`numerous SQL functions and operators<functions>`.
 .. toctree::
     :maxdepth: 2
 
-    language/sql-support
     language/types
     language/reserved

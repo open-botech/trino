@@ -196,7 +196,7 @@ public class ElasticsearchMetadata
                 handle.getLimit(),
                 termAggregationList,
                 aggregationList);
-        return Optional.of(new AggregationApplicationResult<>(tableHandle, projections.build(), resultAssignments.build(), ImmutableMap.of()));
+        return Optional.of(new AggregationApplicationResult<>(tableHandle, projections.build(), resultAssignments.build(), ImmutableMap.of(),true));
     }
 
     @Override

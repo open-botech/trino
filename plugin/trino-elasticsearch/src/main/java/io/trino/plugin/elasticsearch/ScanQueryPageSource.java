@@ -138,8 +138,8 @@ public class ScanQueryPageSource
         SearchResponse searchResponse = client.beginSearch(
                 split.getIndex(),
                 split.getShard(),
-
                 buildSearchQuery(table.getConstraint().transformKeys(ElasticsearchColumnHandle.class::cast), table.getQuery()),
+                Optional.empty(),
                 needAllFields ? Optional.empty() : Optional.of(requiredFields),
                 sort,
                 table.getLimit());
